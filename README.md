@@ -5,3 +5,7 @@ Used to display possible solutions for my apprentices’ tasks (and Binary Canva
 [Stoppuhr](https://leohaas99.github.io/Stoppuhr)
 
 [Binary Canvas](https://leohaas99.github.io/BinaryCanvas/)
+
+[Chess](https://leohaas99.github.io/Chess/) pure vibecoding
+
+[Nonogramm](https://leohaas99.github.io/Nonogramm/) büll
