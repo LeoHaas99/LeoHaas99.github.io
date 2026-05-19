@@ -296,7 +296,8 @@
 
       <div class="controls">
         <button id="resetBtn">Reset Game</button>
-        <button id="flipBtn" class="secondary">Flip Board</button>
+        <button id="startBtn" class="secondary">Start Game</button>
+        <button id="sideBtn" class="secondary">Play as Black</button>
       </div>
 
       <div class="captured">
@@ -311,7 +312,7 @@
       </div>
 
       <p class="rules">
-        <strong>Computer logic:</strong> the AI searches legal moves with minimax, alpha-beta pruning, material values, mobility, checks, and simple positional bonuses.
+        <strong>Computer logic:</strong> choose your side before the first move, then start the game. To castle, select your king and click either the castling square or the rook.
       </p>
     </aside>
   </main>
@@ -321,7 +322,8 @@
     const messageEl = document.getElementById('message');
     const turnBadgeEl = document.getElementById('turnBadge');
     const resetBtn = document.getElementById('resetBtn');
-    const flipBtn = document.getElementById('flipBtn');
+    const sideBtn = document.getElementById('sideBtn');
+    const startBtn = document.getElementById('startBtn');
     const modeSelect = document.getElementById('modeSelect');
     const difficultySelect = document.getElementById('difficultySelect');
     const capturedByWhiteEl = document.getElementById('capturedByWhite');
@@ -334,10 +336,10 @@
 
     const VALUES = { pawn: 100, knight: 320, bishop: 330, rook: 500, queen: 900, king: 20000 };
     const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-    const AI_COLOR = 'black';
-    const HUMAN_COLOR = 'white';
+    let humanColor = 'white';
+    let aiColor = 'black';
 
-    let board, currentPlayer, selected, legalMoves, flipped, gameOver, captured, enPassantTarget, aiThinking;
+    let board, currentPlayer, selected, legalMoves, flipped, gameOver, captured, enPassantTarget, aiThinking, moveCount, gameStarted;
 
     function createInitialBoard() {
       const empty = Array.from({ length: 8 }, () => Array(8).fill(null));
@@ -359,13 +361,27 @@
       flipped = false;
       gameOver = false;
       aiThinking = false;
+      moveCount = 0;
+      gameStarted = false;
       captured = { white: [], black: [] };
       enPassantTarget = null;
+      flipped = isSinglePlayer() && humanColor === 'black';
       render();
-      setMessage(isSinglePlayer() ? 'You are White. Select a piece, then choose a highlighted square.' : 'White moves first. Select a piece, then choose a highlighted square.');
+      if (isSinglePlayer()) {
+        setMessage(humanColor === 'black'
+          ? 'You are Black. Press Start Game when ready, or switch back to White first.'
+          : 'You are White. Press Start Game when ready, or switch sides first.');
+      } else {
+        gameStarted = true;
+        setMessage('White moves first. Select a piece, then choose a highlighted square.');
+      }
     }
 
     function isSinglePlayer() { return modeSelect.value === 'computer'; }
+    function syncSides() {
+      aiColor = opponent(humanColor);
+      flipped = isSinglePlayer() && humanColor === 'black';
+    }
     function cloneBoard(source) { return source.map(row => row.map(piece => piece ? { ...piece } : null)); }
     function inBounds(r, c) { return r >= 0 && r < 8 && c >= 0 && c < 8; }
     function opponent(color) { return color === 'white' ? 'black' : 'white'; }
@@ -387,10 +403,14 @@
 
           const isSelected = selected && selected.r === r && selected.c === c;
           const matchingMove = legalMoves.find(m => m.r === r && m.c === c);
+          const matchingCastleRook = selected && board[selected.r][selected.c]?.type === 'king' && legalMoves.some(m =>
+            m.castle && m.r === r && ((m.c === 6 && c === 7) || (m.c === 2 && c === 0))
+          );
           const kingInCheck = board[r][c]?.type === 'king' && board[r][c]?.color === currentPlayer && isInCheck(currentPlayer, board);
 
           if (isSelected) square.classList.add('selected');
           if (matchingMove) square.classList.add(board[r][c] || matchingMove.enPassant ? 'capture' : 'legal');
+          if (matchingCastleRook) square.classList.add('legal');
           if (kingInCheck && !gameOver) square.classList.add('check');
 
           const piece = board[r][c];
@@ -419,14 +439,25 @@
         }
       }
 
-      turnBadgeEl.textContent = gameOver ? 'Game over' : aiThinking ? 'Computer thinking...' : `${capitalize(currentPlayer)} to move`;
+      turnBadgeEl.textContent = gameOver ? 'Game over' : !gameStarted && isSinglePlayer() ? 'Ready' : aiThinking ? 'Computer thinking...' : `${capitalize(currentPlayer)} to move`;
+      sideBtn.textContent = humanColor === 'white' ? 'Play as Black' : 'Play as White';
+      sideBtn.disabled = gameStarted || aiThinking || !isSinglePlayer();
+      sideBtn.style.opacity = sideBtn.disabled ? '0.55' : '1';
+      sideBtn.style.cursor = sideBtn.disabled ? 'not-allowed' : 'pointer';
+      startBtn.disabled = gameStarted || aiThinking || !isSinglePlayer();
+      startBtn.style.opacity = startBtn.disabled ? '0.55' : '1';
+      startBtn.style.cursor = startBtn.disabled ? 'not-allowed' : 'pointer';
       capturedByWhiteEl.textContent = captured.white.map(p => PIECES[p.color][p.type]).join(' ');
       capturedByBlackEl.textContent = captured.black.map(p => PIECES[p.color][p.type]).join(' ');
     }
 
     function onSquareClick(event) {
       if (gameOver || aiThinking) return;
-      if (isSinglePlayer() && currentPlayer === AI_COLOR) return;
+      if (isSinglePlayer() && !gameStarted) {
+        setMessage('Press Start Game before moving.');
+        return;
+      }
+      if (isSinglePlayer() && currentPlayer === aiColor) return;
 
       const square = event.currentTarget;
       const r = Number(square.dataset.r);
@@ -434,7 +465,12 @@
       const piece = board[r][c];
 
       if (selected) {
-        const move = legalMoves.find(m => m.r === r && m.c === c);
+        let move = legalMoves.find(m => m.r === r && m.c === c);
+        const selectedPiece = board[selected.r][selected.c];
+        if (!move && selectedPiece?.type === 'king' && piece?.type === 'rook' && piece.color === selectedPiece.color) {
+          const castleCol = c === 7 ? 6 : c === 0 ? 2 : null;
+          if (castleCol !== null) move = legalMoves.find(m => m.castle && m.r === selected.r && m.c === castleCol);
+        }
         if (move) {
           makeMove(selected.r, selected.c, move, true);
           selected = null;
@@ -449,7 +485,17 @@
       if (piece && piece.color === currentPlayer) {
         selected = { r, c };
         legalMoves = getLegalMoves(r, c, board, currentPlayer, enPassantTarget);
-        setMessage(`${capitalize(currentPlayer)} selected ${piece.type} on ${coord(r, c)}.`);
+        if (piece.type === 'king') {
+          const castleMoves = legalMoves.filter(m => m.castle);
+          if (castleMoves.length) {
+            const sides = castleMoves.map(m => m.c === 6 ? 'kingside' : 'queenside').join(' or ');
+            setMessage(`${capitalize(currentPlayer)} selected king on ${coord(r, c)}. Castling is available ${sides}; click the highlighted square or rook.`);
+          } else {
+            setMessage(`${capitalize(currentPlayer)} selected king on ${coord(r, c)}. Castling is not currently legal: the path must be clear, the king and rook must be unmoved, and the king cannot castle through check.`);
+          }
+        } else {
+          setMessage(`${capitalize(currentPlayer)} selected ${piece.type} on ${coord(r, c)}.`);
+        }
       } else {
         selected = null;
         legalMoves = [];
@@ -460,6 +506,8 @@
 
     function makeMove(fromR, fromC, move, trackCaptured = true) {
       const piece = board[fromR][fromC];
+      gameStarted = true;
+      moveCount++;
       const target = board[move.r][move.c];
       const previousEnPassant = enPassantTarget;
 
@@ -496,7 +544,7 @@
       }
 
       if (piece.type === 'pawn' && (move.r === 0 || move.r === 7)) {
-        if (currentPlayer === AI_COLOR) {
+        if (currentPlayer === aiColor) {
           piece.type = 'queen';
         } else {
           const choice = prompt('Promote pawn to queen, rook, bishop, or knight:', 'queen');
@@ -520,12 +568,12 @@
       } else if (inCheck) {
         setMessage(`${capitalize(currentPlayer)} is in check.`);
       } else {
-        setMessage(isSinglePlayer() && currentPlayer === AI_COLOR ? 'Computer is thinking...' : `${capitalize(currentPlayer)} to move.`);
+        setMessage(isSinglePlayer() && currentPlayer === aiColor ? 'Computer is thinking...' : `${capitalize(currentPlayer)} to move.`);
       }
     }
 
     function maybeComputerMove() {
-      if (!isSinglePlayer() || gameOver || currentPlayer !== AI_COLOR) return;
+      if (!isSinglePlayer() || !gameStarted || gameOver || currentPlayer !== aiColor) return;
       aiThinking = true;
       render();
       setTimeout(() => {
@@ -541,14 +589,14 @@
     }
 
     function chooseComputerMove(depth) {
-      const moves = getAllLegalMoves(AI_COLOR, board, enPassantTarget);
+      const moves = getAllLegalMoves(aiColor, board, enPassantTarget);
       if (!moves.length) return null;
 
       let bestScore = -Infinity;
       let bestMoves = [];
 
       for (const candidate of shuffle(moves)) {
-        const state = simulateState(board, enPassantTarget, candidate.fromR, candidate.fromC, candidate.move, AI_COLOR);
+        const state = simulateState(board, enPassantTarget, candidate.fromR, candidate.fromC, candidate.move, aiColor);
         const score = minimax(state.board, state.enPassant, depth - 1, -Infinity, Infinity, false);
         if (score > bestScore) {
           bestScore = score;
@@ -561,7 +609,7 @@
     }
 
     function minimax(simBoard, simEnPassant, depth, alpha, beta, maximizing) {
-      const color = maximizing ? AI_COLOR : HUMAN_COLOR;
+      const color = maximizing ? aiColor : humanColor;
       const legal = getAllLegalMoves(color, simBoard, simEnPassant);
       const inCheck = isInCheck(color, simBoard);
 
@@ -576,7 +624,7 @@
       if (maximizing) {
         let value = -Infinity;
         for (const candidate of orderMoves(legal, simBoard)) {
-          const state = simulateState(simBoard, simEnPassant, candidate.fromR, candidate.fromC, candidate.move, AI_COLOR);
+          const state = simulateState(simBoard, simEnPassant, candidate.fromR, candidate.fromC, candidate.move, aiColor);
           value = Math.max(value, minimax(state.board, state.enPassant, depth - 1, alpha, beta, false));
           alpha = Math.max(alpha, value);
           if (alpha >= beta) break;
@@ -585,7 +633,7 @@
       } else {
         let value = Infinity;
         for (const candidate of orderMoves(legal, simBoard)) {
-          const state = simulateState(simBoard, simEnPassant, candidate.fromR, candidate.fromC, candidate.move, HUMAN_COLOR);
+          const state = simulateState(simBoard, simEnPassant, candidate.fromR, candidate.fromC, candidate.move, humanColor);
           value = Math.min(value, minimax(state.board, state.enPassant, depth - 1, alpha, beta, true));
           beta = Math.min(beta, value);
           if (alpha >= beta) break;
@@ -601,14 +649,14 @@
           const piece = simBoard[r][c];
           if (!piece) continue;
           let value = VALUES[piece.type] + positionalBonus(piece, r, c);
-          score += piece.color === AI_COLOR ? value : -value;
+          score += piece.color === aiColor ? value : -value;
         }
       }
 
-      score += getAllLegalMoves(AI_COLOR, simBoard, simEnPassant).length * 3;
-      score -= getAllLegalMoves(HUMAN_COLOR, simBoard, simEnPassant).length * 3;
-      if (isInCheck(HUMAN_COLOR, simBoard)) score += 35;
-      if (isInCheck(AI_COLOR, simBoard)) score -= 45;
+      score += getAllLegalMoves(aiColor, simBoard, simEnPassant).length * 3;
+      score -= getAllLegalMoves(humanColor, simBoard, simEnPassant).length * 3;
+      if (isInCheck(humanColor, simBoard)) score += 35;
+      if (isInCheck(aiColor, simBoard)) score -= 45;
       return score;
     }
 
@@ -688,6 +736,7 @@
       const moving = targetBoard[fromR][fromC];
       targetBoard[move.r][move.c] = moving;
       targetBoard[fromR][fromC] = null;
+      if (moving) moving.hasMoved = true;
 
       if (move.enPassant) {
         const capturedPawnRow = moving.color === 'white' ? move.r + 1 : move.r - 1;
@@ -858,8 +907,28 @@
     }
 
     resetBtn.addEventListener('click', resetGame);
-    flipBtn.addEventListener('click', () => { flipped = !flipped; render(); });
-    modeSelect.addEventListener('change', resetGame);
+    startBtn.addEventListener('click', () => {
+      if (gameStarted || aiThinking || !isSinglePlayer()) return;
+      gameStarted = true;
+      render();
+      if (humanColor === 'black') {
+        setMessage('Computer is thinking...');
+        maybeComputerMove();
+      } else {
+        setMessage('You are White. Select a piece, then choose a highlighted square.');
+      }
+    });
+    sideBtn.addEventListener('click', () => {
+      if (gameStarted || aiThinking || !isSinglePlayer()) return;
+      humanColor = humanColor === 'white' ? 'black' : 'white';
+      syncSides();
+      resetGame();
+    });
+    modeSelect.addEventListener('change', () => {
+      if (!isSinglePlayer()) humanColor = 'white';
+      syncSides();
+      resetGame();
+    });
     difficultySelect.addEventListener('change', () => {
       if (!gameOver) setMessage(`Difficulty set to ${difficultySelect.options[difficultySelect.selectedIndex].text}.`);
     });
