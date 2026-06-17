@@ -1,8 +1,38 @@
 body {
     margin: 0;
-overflow: hidden;
-width: 100vw;
-height: 100vh;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+}
+
+body.link-hover {
+    cursor: pointer;
+}
+
+.site-links {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    max-width: calc(100vw - 2rem);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.site-links:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.site-links a {
+    color: #005fcc;
+    font: 16px/1.4 "Courier New", monospace;
+    background: rgba(255, 255, 255, 0.88);
+    padding: 0.25rem 0.5rem;
+    text-decoration: underline;
 }
 
 .bg-gradient {

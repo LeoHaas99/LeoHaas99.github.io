@@ -8,15 +8,30 @@ class Main {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
 
-        this.frame = new Frame(this.canvas);
+        this.frame = new Frame(this.canvas, this.getPageLinks());
         window.addEventListener("mousemove", (e) => {
-            this.x = e.clientX + window.scrollX
-            this.y = e.clientY + window.scrollY;
+            const point = this.getCanvasPoint(e);
+            this.x = point.x;
+            this.y = point.y;
+            this.updateHover(point);
         });
         // also for mobile
         window.addEventListener("touchmove", (e) => {
-            this.x = e.touches[0].clientX + window.scrollX;
-            this.y = e.touches[0].clientY + window.scrollY;
+            const point = this.getCanvasPoint(e.touches[0]);
+            this.x = point.x;
+            this.y = point.y;
+        });
+        window.addEventListener("click", (e) => {
+            if (e.target.closest(".site-links")) {
+                return;
+            }
+
+            const point = this.getCanvasPoint(e);
+            const linkTarget = this.frame.getLinkAt(point.x, point.y);
+
+            if (linkTarget) {
+                window.location.href = linkTarget.href;
+            }
         });
         window.addEventListener("resize", (e) => {
             this.canvas.width = window.innerWidth;
@@ -30,6 +45,22 @@ class Main {
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.frame.update(this.x, this.y, this.canvas, this.gravity);
         requestAnimationFrame(this.update.bind(this));
+    }
+
+    getCanvasPoint(eventPoint) {
+        const rect = this.canvas.getBoundingClientRect();
+        return new Vector(eventPoint.clientX - rect.left, eventPoint.clientY - rect.top);
+    }
+
+    updateHover(point) {
+        document.body.classList.toggle("link-hover", Boolean(this.frame.getLinkAt(point.x, point.y)));
+    }
+
+    getPageLinks() {
+        return Array.from(document.querySelectorAll(".site-links a")).map((link) => ({
+            label: link.textContent,
+            href: link.getAttribute("href"),
+        }));
     }
 }
 
