@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Something To Do</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <p class="eyebrow">Bored?</p>
+        <h1>Here is stuff you wanted to do.</h1>
+        <p class="intro">Open this when you do not know what to do next. Pick one thing and start small.</p>
+      </header>
+
+      <section id="suggestion" class="suggestion-card" aria-live="polite">
+        <div class="loading">Finding something...</div>
+      </section>
+
+      <section id="reading" class="reading-section" aria-live="polite">
+        <div class="loading">Loading books...</div>
+      </section>
+
+      <section class="secondary-grid" aria-label="Other interests">
+        <article id="games" class="secondary-card" aria-live="polite">
+          <div class="loading">Loading games...</div>
+        </article>
+
+        <article id="watching" class="secondary-card" aria-live="polite">
+          <div class="loading">Loading movies and shows...</div>
+        </article>
+      </section>
+
+      <section id="archive" class="archive-section" aria-live="polite"></section>
+
+      <p id="error" class="error" hidden></p>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

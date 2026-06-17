@@ -1,0 +1,55 @@
+{
+  "reading": {
+    "books": [
+      {
+        "title": "Schweizerspiegel",
+        "author": "Meinrad Inglin",
+        "mood": ""
+      },
+      {
+        "title": "Wassili Grossman",
+        "author": "Leben und Schicksal",
+        "mood": ""
+      },
+      {
+        "title": "The Haunting of Hill House",
+        "author": "Shirley Jackson",
+        "mood": ""
+      },
+      {
+        "title": "Der Spieler",
+        "author": "Fjodor Dostojewski",
+        "mood": ""
+      }
+    ]
+  },
+  "videoGames": [
+    {
+      "title": "The Witcher 3: Wild Hunt",
+      "note": "Replay before new DLC",
+      "mood": ""
+    },
+    {
+      "title": "Disco Elysium",
+      "note": "Replay just because",
+      "mood": ""
+    }
+  ],
+  "moviesAndShows": [
+    {
+      "title": "Backrooms",
+      "platform": "Movie",
+      "director": "",
+      "mood": ""
+    },
+    {
+      "title": "Disclosure Day",
+      "platform": "Movie",
+      "director": "Steven Spielberg",
+      "mood": ""
+    }
+  ],
+  "archive": [
+    
+  ]
+}
