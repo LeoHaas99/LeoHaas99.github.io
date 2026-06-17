@@ -25,7 +25,11 @@ class Main {
             const linkTarget = this.frame.getLinkAt(point.x, point.y);
 
             if (linkTarget) {
-                window.location.href = linkTarget.href;
+                if (linkTarget.target === "_blank") {
+                    window.open(linkTarget.href, "_blank", "noopener");
+                } else {
+                    window.location.href = linkTarget.href;
+                }
             }
         });
         window.addEventListener("resize", (e) => {
@@ -60,6 +64,7 @@ class Main {
         return Array.from(document.querySelectorAll(".site-links a")).map((link) => ({
             label: link.textContent,
             href: link.getAttribute("href"),
+            target: link.getAttribute("target"),
         }));
     }
 }
