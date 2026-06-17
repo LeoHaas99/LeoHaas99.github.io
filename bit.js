@@ -42,8 +42,10 @@ class Bit {
 
     move(gravity, canvas) {
         if (this.isLink) {
-            this.velocity.y += gravity * 0.02;
-            this.limitSpeed(0.45);
+            this.applyCenterPull(canvas);
+            this.velocity.x *= 0.998;
+            this.velocity.y *= 0.998;
+            this.limitSpeed(0.75);
             this.position.add(this.velocity);
             this.bounceOffBorders(canvas);
             this.draw();
@@ -107,6 +109,26 @@ class Bit {
         } else if (this.bounds.y + this.bounds.height > canvas.height) {
             this.position.y -= this.bounds.y + this.bounds.height - canvas.height;
             this.velocity.y = -Math.abs(this.velocity.y);
+        }
+    }
+
+    applyCenterPull(canvas) {
+        if (!canvas) {
+            return;
+        }
+
+        this.updateBounds();
+        const currentCenter = new Vector(
+            this.bounds.x + this.bounds.width / 2,
+            this.bounds.y + this.bounds.height / 2
+        );
+        const canvasCenter = new Vector(canvas.width / 2, canvas.height / 2);
+        const pull = new Vector(canvasCenter.x - currentCenter.x, canvasCenter.y - currentCenter.y);
+        const deadZone = Math.min(canvas.width, canvas.height) * 0.28;
+
+        if (pull.length > deadZone) {
+            pull.length = Math.min((pull.length - deadZone) * 0.00012, 0.006);
+            this.velocity.add(pull);
         }
     }
 }

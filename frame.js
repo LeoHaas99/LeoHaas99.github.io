@@ -59,10 +59,14 @@ class Frame {
     }
 
     bounceLinks(bitA, bitB) {
+        bitA.updateBounds();
+        bitB.updateBounds();
+
         if (!this.rectanglesOverlap(bitA.bounds, bitB.bounds)) {
             return;
         }
 
+        const separationPadding = 8;
         const overlapX = Math.min(bitA.bounds.x + bitA.bounds.width, bitB.bounds.x + bitB.bounds.width)
             - Math.max(bitA.bounds.x, bitB.bounds.x);
         const overlapY = Math.min(bitA.bounds.y + bitA.bounds.height, bitB.bounds.y + bitB.bounds.height)
@@ -70,26 +74,26 @@ class Frame {
 
         if (overlapX < overlapY) {
             const direction = bitA.position.x < bitB.position.x ? -1 : 1;
-            const bitASpeed = Math.max(Math.abs(bitA.velocity.x), 0.15);
-            const bitBSpeed = Math.max(Math.abs(bitB.velocity.x), 0.15);
+            const bitASpeed = Math.max(Math.abs(bitA.velocity.x), 0.45);
+            const bitBSpeed = Math.max(Math.abs(bitB.velocity.x), 0.45);
 
-            bitA.position.x += direction * (overlapX / 2 + 0.5);
-            bitB.position.x -= direction * (overlapX / 2 + 0.5);
+            bitA.position.x += direction * (overlapX / 2 + separationPadding);
+            bitB.position.x -= direction * (overlapX / 2 + separationPadding);
             bitA.velocity.x = direction * bitBSpeed;
             bitB.velocity.x = -direction * bitASpeed;
         } else {
             const direction = bitA.position.y < bitB.position.y ? -1 : 1;
-            const bitASpeed = Math.max(Math.abs(bitA.velocity.y), 0.15);
-            const bitBSpeed = Math.max(Math.abs(bitB.velocity.y), 0.15);
+            const bitASpeed = Math.max(Math.abs(bitA.velocity.y), 0.45);
+            const bitBSpeed = Math.max(Math.abs(bitB.velocity.y), 0.45);
 
-            bitA.position.y += direction * (overlapY / 2 + 0.5);
-            bitB.position.y -= direction * (overlapY / 2 + 0.5);
+            bitA.position.y += direction * (overlapY / 2 + separationPadding);
+            bitB.position.y -= direction * (overlapY / 2 + separationPadding);
             bitA.velocity.y = direction * bitBSpeed;
             bitB.velocity.y = -direction * bitASpeed;
         }
 
-        bitA.limitSpeed(0.45);
-        bitB.limitSpeed(0.45);
+        bitA.limitSpeed(1);
+        bitB.limitSpeed(1);
         bitA.updateBounds();
         bitB.updateBounds();
     }
