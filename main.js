@@ -5,27 +5,22 @@ class Main {
         this.y = 0;
 
         this.canvas = document.getElementById('bgCanvas');
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+        this.resizeCanvas();
 
         this.frame = new Frame(this.canvas, this.getPageLinks());
-        window.addEventListener("mousemove", (e) => {
+        this.canvas.addEventListener("mousemove", (e) => {
             const point = this.getCanvasPoint(e);
             this.x = point.x;
             this.y = point.y;
             this.updateHover(point);
         });
         // also for mobile
-        window.addEventListener("touchmove", (e) => {
+        this.canvas.addEventListener("touchmove", (e) => {
             const point = this.getCanvasPoint(e.touches[0]);
             this.x = point.x;
             this.y = point.y;
         });
-        window.addEventListener("click", (e) => {
-            if (e.target.closest(".site-links")) {
-                return;
-            }
-
+        this.canvas.addEventListener("click", (e) => {
             const point = this.getCanvasPoint(e);
             const linkTarget = this.frame.getLinkAt(point.x, point.y);
 
@@ -34,8 +29,7 @@ class Main {
             }
         });
         window.addEventListener("resize", (e) => {
-            this.canvas.width = window.innerWidth;
-            this.canvas.height = window.innerHeight;
+            this.resizeCanvas();
         });
         requestAnimationFrame(this.update.bind(this));
     }
@@ -50,6 +44,12 @@ class Main {
     getCanvasPoint(eventPoint) {
         const rect = this.canvas.getBoundingClientRect();
         return new Vector(eventPoint.clientX - rect.left, eventPoint.clientY - rect.top);
+    }
+
+    resizeCanvas() {
+        const rect = this.canvas.getBoundingClientRect();
+        this.canvas.width = rect.width;
+        this.canvas.height = rect.height;
     }
 
     updateHover(point) {

@@ -3,6 +3,7 @@ body {
     overflow: hidden;
     width: 100vw;
     height: 100vh;
+    background: #fff;
 }
 
 body.link-hover {
@@ -35,9 +36,51 @@ body.link-hover {
     text-decoration: underline;
 }
 
+.title-bar {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.page-title {
+    margin: 0;
+    font-family: "Comic Sans MS", "Comic Sans", cursive;
+    font-size: 42px;
+    font-weight: 700;
+    line-height: 1;
+    color: #ff00dd;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.title-image {
+    width: 200px;
+    height: 200px;
+    object-fit: cover;
+}
+
+.stage {
+    display: grid;
+    grid-template-columns: clamp(96px, 22vw, 280px) minmax(0, 1fr) clamp(96px, 22vw, 280px);
+    width: 100vw;
+    height: 100vh;
+}
+
+.side-gif {
+    width: 100%;
+    height: 100vh;
+    object-fit: cover;
+    display: block;
+}
+
 .bg-gradient {
-    position: absolute;
-    top: 0;
-    left: 0;
-    z-index: -1;
+    width: 100%;
+    height: 100vh;
+    display: block;
 }
