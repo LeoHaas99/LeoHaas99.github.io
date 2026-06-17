@@ -2,10 +2,12 @@
 
 Used to display possible solutions for my apprentices’ tasks (and Binary Canvas).
 
-[Stoppuhr](https://leohaas99.github.io/Stoppuhr)
+[Stoppuhr](https://leohaas99.github.io/stopwatch/)
 
-[Binary Canvas](https://leohaas99.github.io/BinaryCanvas/)
+[Binary Canvas](https://leohaas99.github.io/binary-canvas/)
 
-[Chess](https://leohaas99.github.io/Chess/) pure vibecoding
+[Chess](https://leohaas99.github.io/chess/) pure vibecoding
 
-[Nonogramm](https://leohaas99.github.io/Nonogramm/) büll
+[Nonogramm](https://leohaas99.github.io/nonogram/) büll
+
+[Something to do](https://leohaas99.github.io/daily/) things to do when bored
