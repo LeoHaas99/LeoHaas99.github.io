@@ -1,6 +1,6 @@
 [LeoHaas99.github.io](https://leohaas99.github.io/)
 
-Used to display possible solutions for my apprentices’ tasks (and Binary Canvas).
+Used to display possible solutions for my apprentices’ tasks (and other stuff).
 
 [Stoppuhr](https://leohaas99.github.io/stopwatch/)
 
