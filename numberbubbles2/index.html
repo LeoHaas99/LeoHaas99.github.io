@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Number Bubbles</title>
+    <link rel="stylesheet" href="./css/style.css">
+    <script src="./js/main.js" defer></script>
+</head>
+<body>
+    <div id="doneContainer">
+        <h1>Number Bubbles</h1>
+        <h2 class="doneText">Fertig</h2>
+    </div>
+
+    <div id="titleContainer">    
+        <h2 id="tries"></h2>
+        <div id="resetButton">Reset</div>
+    </div>
+    
+
+    <canvas id="gameCanvas" width="600" height="600"></canvas>
+
+    <div class="sliderContainer">
+        <label for="bounce">Bounce:</label>
+        <input type="range" id="bounce" max="100" min="0" value="80">
+        <label for="bounce" id="bounceValue"></label>
+    </div>
+
+    <div class="sliderContainer">
+        <label for="gravity">Gravity:</label>
+        <input type="range" id="gravity" min="1" max="200" value="10">
+        <label for="gravity" id="gravityValue"></label>
+    </div>
+</body>
+</html>

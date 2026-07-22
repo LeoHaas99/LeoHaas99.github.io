@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Number Bubbles</title>
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <h1>Number Bubbles</h1>
+    <canvas id="gameCanvas" width="600" height="600"></canvas><br><br>
+    <h2 id="tries"></h2>
+    <h2 class="fertig">Fertig</h2>
+    <label for="bounce">Bounce:</label>
+    <input type="range" id="bounce" max="100" min="0" value="80" oninput="changeValue()">
+    <label for="bounce" id="bounceValue"></label><br><br>
+    <label for="gravity">Gravitation:</label>
+    <input type="range" id="gravity" min="1" max="200" value="10" oninput="changeGravity()">
+    <label for="gravity" id="gravityValue"></label><br><br>
+    <button onclick="startGame()">Spielen</button>
+    <script src="./javascript/script.js"></script>
+</body>
+</html>

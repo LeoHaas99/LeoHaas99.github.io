@@ -1,0 +1,82 @@
+html, body {
+    margin: 0;
+    background: black;
+    color: white;
+}
+
+body {
+    padding-bottom: 2rem;
+}
+
+body {
+    font-family: 'Courier New', Courier, monospace;
+}
+
+#resetButton {
+    border: white solid 2px;
+    font-weight: 800;
+    color: white;
+    padding: 5px 16px;
+    font-size: 1.1rem;
+    border-radius: 3px;
+    user-select: none;
+    cursor: pointer;
+}
+
+#resetButton:hover {
+    background-color: white;
+    color: black;
+}
+
+canvas {
+    display: block;
+    margin: 1rem auto 2rem auto;
+    border-radius: 7px;
+    background-color: rgb(32, 32, 32);
+}
+
+h1 {
+    font-size: 1.3rem;
+    font-weight: 100;
+    letter-spacing: 0.03rem;
+    text-align: center;
+    margin: 0;
+}
+
+h2#tries {
+    font-size: 1.2rem;
+    letter-spacing: 0.04rem;
+    margin: 0;
+}
+
+h2.doneText {
+    visibility: hidden;
+    text-align: center;
+    font-weight: 100;
+    font-size: 1.1rem;
+    margin: 0;
+}
+h2.doneText.visible {
+    visibility: visible;
+}
+
+#doneContainer, #titleContainer {
+    padding: 0 3rem 0 3rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#titleContainer {
+    padding: 0rem 3rem 0.5rem 3rem;
+    margin-bottom: 0.5rem;
+}
+
+#doneContainer {
+    padding: 1rem 3rem 0.5rem 3rem;
+}
+
+.sliderContainer {
+    text-align: center;
+    margin: 0.5rem 0;
+}
