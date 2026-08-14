@@ -15,11 +15,6 @@
         "title": "The Haunting of Hill House",
         "author": "Shirley Jackson",
         "mood": ""
-      },
-      {
-        "title": "Der Spieler",
-        "author": "Fjodor Dostojewski",
-        "mood": ""
       }
     ]
   },
@@ -37,10 +32,10 @@
   ],
   "moviesAndShows": [
     {
-      "title": "Backrooms",
-      "platform": "Movie",
+      "title": "Ted Lasso",
+      "platform": "TV-Show",
       "director": "",
-      "mood": ""
+      "mood": "rewatching"
     },
     {
       "title": "Disclosure Day",
