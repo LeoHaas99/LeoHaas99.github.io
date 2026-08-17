@@ -1076,13 +1076,16 @@ function handleRelocated(location) {
     Number.isFinite(chapterTotal) &&
     chapterPage > 0 &&
     chapterTotal > 0;
-  const chapterPercentage = hasChapterPages
-    ? Math.round((chapterPage / chapterTotal) * 100)
+  const percentageValue = Number.isFinite(percentage)
+    ? clamp(percentage * 100, 0, 100)
+    : null;
+  const roundedBookPercentage = Number.isFinite(percentageValue)
+    ? Math.round(percentageValue)
     : null;
 
   elements.locationLabel.textContent = state.currentChapter || "Reading";
   elements.chapterStats.textContent = hasChapterPages
-    ? `Chapter ${chapterPage}/${chapterTotal} · ${chapterPercentage}%`
+    ? `Chapter ${chapterPage}/${chapterTotal}`
     : "Chapter —";
 
   let bookPage = null;
@@ -1104,18 +1107,18 @@ function handleRelocated(location) {
   const hasBookPages =
     Number.isFinite(bookPage) && Number.isFinite(bookTotal) && bookTotal > 0;
   elements.bookStats.textContent = hasBookPages
-    ? `Book ${clamp(bookPage, 1, bookTotal)}/${bookTotal}`
+    ? `Book ${clamp(bookPage, 1, bookTotal)}/${bookTotal}${
+        Number.isFinite(roundedBookPercentage) ? ` · ${roundedBookPercentage}%` : ""
+      }`
     : state.locationsReady
       ? "Book pages unavailable"
       : "Book pages calculating…";
 
   if (Number.isFinite(percentage)) {
-    const percentageValue = clamp(percentage * 100, 0, 100);
-    const roundedPercentage = Math.round(percentageValue);
     elements.progress.value = percentageValue.toFixed(1);
-    elements.progressValue.value = `${roundedPercentage}%`;
-    elements.progressValue.textContent = `${roundedPercentage}%`;
-    elements.progress.setAttribute("aria-valuetext", `${roundedPercentage}% read`);
+    elements.progressValue.value = `${roundedBookPercentage}%`;
+    elements.progressValue.textContent = `${roundedBookPercentage}%`;
+    elements.progress.setAttribute("aria-valuetext", `${roundedBookPercentage}% read`);
   }
 
   saveCurrentPosition(location.start.cfi, percentage);
