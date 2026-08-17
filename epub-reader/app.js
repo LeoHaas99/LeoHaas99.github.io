@@ -1,10 +1,14 @@
 const PREFS_KEY = "epub-reader:prefs:v1";
 const POSITION_PREFIX = "epub-reader:position:";
 const FONT_MIN = 80;
-const FONT_MAX = 160;
+const FONT_MAX = 300;
 const FONT_STEP = 10;
+const READER_WIDTH_MIN = 10;
+const READER_WIDTH_MAX = 100;
+const READER_WIDTH_STEP = 10;
 const LOCATION_BREAK_SIZE = 1600;
 const OPEN_TIMEOUT_MS = 15000;
+const CONTENT_THEME_STYLE_ID = "epub-reader-content-theme";
 
 const elements = {
   app: document.querySelector("#app"),
@@ -31,6 +35,9 @@ const elements = {
   fontDecrease: document.querySelector("#font-decrease"),
   fontIncrease: document.querySelector("#font-increase"),
   fontSize: document.querySelector("#font-size"),
+  widthDecrease: document.querySelector("#width-decrease"),
+  widthIncrease: document.querySelector("#width-increase"),
+  readerWidth: document.querySelector("#reader-width"),
   themeToggle: document.querySelector("#theme-toggle"),
   fullscreenToggle: document.querySelector("#fullscreen-toggle"),
   progress: document.querySelector("#progress"),
@@ -61,6 +68,7 @@ const state = {
     : "Reading works, but this browser is blocking local storage, so positions and preferences cannot be saved.",
   theme: initialPreferences.theme,
   fontSize: initialPreferences.fontSize,
+  readerWidth: initialPreferences.readerWidth,
   navigationQueue: Promise.resolve(),
   noticeVersion: 0,
 };
@@ -79,7 +87,7 @@ function detectStorage() {
 }
 
 function loadPreferences(canUseStorage) {
-  const defaults = { theme: "light", fontSize: 100 };
+  const defaults = { theme: "light", fontSize: 100, readerWidth: 100 };
 
   if (!canUseStorage) return defaults;
 
@@ -90,8 +98,16 @@ function loadPreferences(canUseStorage) {
     const fontSize = Number.isFinite(savedFontSize)
       ? clamp(Math.round(savedFontSize / FONT_STEP) * FONT_STEP, FONT_MIN, FONT_MAX)
       : defaults.fontSize;
+    const savedReaderWidth = Number(saved?.readerWidth);
+    const readerWidth = Number.isFinite(savedReaderWidth)
+      ? clamp(
+          Math.round(savedReaderWidth / READER_WIDTH_STEP) * READER_WIDTH_STEP,
+          READER_WIDTH_MIN,
+          READER_WIDTH_MAX,
+        )
+      : defaults.readerWidth;
 
-    return { theme, fontSize };
+    return { theme, fontSize, readerWidth };
   } catch {
     return defaults;
   }
@@ -168,7 +184,11 @@ function savePreferences() {
   try {
     window.localStorage.setItem(
       PREFS_KEY,
-      JSON.stringify({ theme: state.theme, fontSize: state.fontSize }),
+      JSON.stringify({
+        theme: state.theme,
+        fontSize: state.fontSize,
+        readerWidth: state.readerWidth,
+      }),
     );
   } catch {
     markPersistenceUnavailable();
@@ -227,30 +247,92 @@ function applyDocumentTheme() {
   elements.themeToggle.setAttribute("aria-label", isDark ? "Use light theme" : "Use dark theme");
 }
 
+function contentThemeCss(theme) {
+  const colors =
+    theme === "dark"
+      ? {
+          background: "#202224",
+          foreground: "#e8e6df",
+          link: "#9bc8db",
+          border: "#5a5d60",
+          selection: "#365d73",
+        }
+      : {
+          background: "#fffefa",
+          foreground: "#262624",
+          link: "#245d7a",
+          border: "#c8c6be",
+          selection: "#c9e1ec",
+        };
+
+  return `
+    :root,
+    body {
+      background-color: ${colors.background} !important;
+      color: ${colors.foreground} !important;
+    }
+
+    body,
+    body * {
+      color: ${colors.foreground} !important;
+      -webkit-text-fill-color: ${colors.foreground} !important;
+    }
+
+    body * {
+      background-color: transparent !important;
+      border-color: ${colors.border} !important;
+    }
+
+    body a,
+    body a * {
+      color: ${colors.link} !important;
+      -webkit-text-fill-color: ${colors.link} !important;
+    }
+
+    ::selection {
+      background-color: ${colors.selection} !important;
+      color: ${colors.foreground} !important;
+      -webkit-text-fill-color: ${colors.foreground} !important;
+    }
+  `;
+}
+
+function applyThemeToContents(contents, theme = state.theme) {
+  const contentDocument = contents?.document;
+  if (!contentDocument?.head) return;
+
+  let style = contentDocument.getElementById(CONTENT_THEME_STYLE_ID);
+  if (!style) {
+    style = contentDocument.createElement("style");
+    style.id = CONTENT_THEME_STYLE_ID;
+    contentDocument.head.append(style);
+  }
+
+  style.textContent = contentThemeCss(theme);
+  contentDocument.documentElement.style.colorScheme = theme;
+}
+
+function applyRenditionTheme(rendition = state.rendition) {
+  if (!rendition) return;
+
+  for (const contents of rendition.getContents()) {
+    applyThemeToContents(contents);
+  }
+}
+
 function applyRenditionAppearance(rendition = state.rendition) {
   if (!rendition) return;
 
-  rendition.themes.register("reader-light", {
-    "html, body": {
-      color: "#262624 !important",
-      background: "#fffefa !important",
-    },
-    a: { color: "#245d7a !important" },
-  });
-  rendition.themes.register("reader-dark", {
-    "html, body": {
-      color: "#e8e6df !important",
-      background: "#202224 !important",
-    },
-    a: { color: "#9bc8db !important" },
-  });
-  rendition.themes.select(state.theme === "dark" ? "reader-dark" : "reader-light");
+  applyRenditionTheme(rendition);
   rendition.themes.fontSize(`${state.fontSize}%`);
 }
 
 function syncAppearanceControls() {
   elements.fontSize.value = `${state.fontSize}%`;
   elements.fontSize.textContent = `${state.fontSize}%`;
+  elements.readerWidth.value = `${state.readerWidth}%`;
+  elements.readerWidth.textContent = `${state.readerWidth}%`;
+  elements.app.style.setProperty("--reader-width", `${state.readerWidth}%`);
   applyDocumentTheme();
   updateControlStates();
 }
@@ -260,7 +342,7 @@ function setTheme(theme) {
   applyDocumentTheme();
 
   if (state.rendition) {
-    state.rendition.themes.select(state.theme === "dark" ? "reader-dark" : "reader-light");
+    applyRenditionTheme(state.rendition);
   }
 
   savePreferences();
@@ -275,6 +357,25 @@ function changeFontSize(direction) {
   syncAppearanceControls();
 }
 
+function changeReaderWidth(direction) {
+  if (!state.rendition || state.busy) return;
+
+  state.readerWidth = clamp(
+    state.readerWidth + direction * READER_WIDTH_STEP,
+    READER_WIDTH_MIN,
+    READER_WIDTH_MAX,
+  );
+  savePreferences();
+  syncAppearanceControls();
+
+  const rendition = state.rendition;
+  window.requestAnimationFrame(() => {
+    if (state.rendition !== rendition) return;
+    rendition.resize();
+    rendition.reportLocation();
+  });
+}
+
 function updateControlStates() {
   const hasBook = Boolean(state.rendition);
   elements.openBook.disabled = state.busy;
@@ -285,6 +386,10 @@ function updateControlStates() {
   elements.nextPage.disabled = state.busy || !hasBook || state.atEnd;
   elements.fontDecrease.disabled = state.busy || !hasBook || state.fontSize <= FONT_MIN;
   elements.fontIncrease.disabled = state.busy || !hasBook || state.fontSize >= FONT_MAX;
+  elements.widthDecrease.disabled =
+    state.busy || !hasBook || state.readerWidth <= READER_WIDTH_MIN;
+  elements.widthIncrease.disabled =
+    state.busy || !hasBook || state.readerWidth >= READER_WIDTH_MAX;
   elements.progress.disabled = state.busy || !hasBook || !state.locationsReady;
   elements.fullscreenToggle.disabled = state.busy || !hasBook || !document.fullscreenEnabled;
 }
@@ -310,11 +415,13 @@ function validateFile(file) {
   if (!file) throw new ReaderError("No file was selected.");
   if (file.size === 0) throw new ReaderError("That EPUB file is empty.");
 
-  const hasEpubExtension = /\.epub$/i.test(file.name);
-  const hasEpubMimeType = file.type === "application/epub+zip";
+  const hasSupportedExtension = /\.(?:epub|kepub|epu)$/i.test(file.name);
+  const hasEpubMimeType = ["application/epub+zip", "application/x-kobo-epub+zip"].includes(
+    file.type,
+  );
 
-  if (!hasEpubExtension && !hasEpubMimeType) {
-    throw new ReaderError("Please choose a file with the .epub extension.");
+  if (!hasSupportedExtension && !hasEpubMimeType) {
+    throw new ReaderError("Please choose an EPUB or Kobo EPUB file.");
   }
 }
 
@@ -344,6 +451,8 @@ function registerRenditionHandlers(rendition) {
   rendition.hooks.content.register((contents) => {
     const contentDocument = contents?.document;
     if (!contentDocument) return;
+
+    applyThemeToContents(contents);
 
     contentDocument.addEventListener("keydown", handleReaderKeydown);
     contentDocument.addEventListener("dragenter", handleDragEnter);
@@ -530,10 +639,11 @@ function promoteCandidate({
   state.atEnd = false;
   state.navigationQueue = Promise.resolve();
 
-  const displayTitle = `${metadata?.title || ""}`.trim() || file.name.replace(/\.epub$/i, "");
+  const displayTitle =
+    `${metadata?.title || ""}`.trim() ||
+    file.name.replace(/(?:\.kepub)?\.epub$|\.kepub$|\.epu$/i, "");
   elements.bookTitle.textContent = displayTitle;
   elements.chapterTitle.textContent = "Finding your place…";
-  document.title = `${displayTitle} — EPUB Reader`;
 
   renderTableOfContents(navigation?.toc || []);
   closeTableOfContents(false);
@@ -857,7 +967,7 @@ function handleDrop(event) {
 
   const files = Array.from(event.dataTransfer?.files || []);
   if (files.length !== 1) {
-    showNotice("Drop one EPUB file at a time.", "error");
+    showNotice("Drop one EPUB or KEPUB file at a time.", "error");
     return;
   }
 
@@ -886,6 +996,8 @@ function initialize() {
   elements.tocBackdrop.addEventListener("click", () => closeTableOfContents());
   elements.fontDecrease.addEventListener("click", () => changeFontSize(-1));
   elements.fontIncrease.addEventListener("click", () => changeFontSize(1));
+  elements.widthDecrease.addEventListener("click", () => changeReaderWidth(-1));
+  elements.widthIncrease.addEventListener("click", () => changeReaderWidth(1));
   elements.themeToggle.addEventListener("click", () => {
     setTheme(state.theme === "dark" ? "light" : "dark");
   });
