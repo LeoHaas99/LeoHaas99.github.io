@@ -69,7 +69,8 @@ button {
 
 button:focus-visible,
 input:focus-visible,
-.toc-link:focus-visible {
+.toc-link:focus-visible,
+.recent-book-button:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent) 72%, transparent);
   outline-offset: 2px;
 }
@@ -112,6 +113,87 @@ button:disabled {
 .book-heading {
   min-width: 0;
   gap: 10px;
+}
+
+.recent-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.recent-panel {
+  position: fixed;
+  top: calc(var(--toolbar-height) + 8px);
+  left: 62px;
+  z-index: 30;
+  width: min(calc(100vw - 78px), 350px);
+  max-height: min(62vh, 430px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+
+.recent-panel[hidden] {
+  display: none;
+}
+
+.recent-header {
+  display: grid;
+  gap: 3px;
+  padding: 13px 14px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.recent-header strong {
+  font-size: 0.9rem;
+}
+
+.recent-header span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.recent-list {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+}
+
+.recent-book-button {
+  display: grid;
+  width: 100%;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.recent-book-button:hover {
+  background: var(--accent-soft);
+}
+
+.recent-book-title,
+.recent-book-detail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-book-title {
+  font-size: 0.82rem;
+  font-weight: 720;
+}
+
+.recent-book-detail {
+  color: var(--muted);
+  font-size: 0.7rem;
 }
 
 .book-labels {
@@ -546,7 +628,7 @@ button:disabled {
   display: grid;
   grid-row: 4;
   min-height: 48px;
-  grid-template-columns: minmax(100px, 260px) minmax(100px, 1fr) 46px;
+  grid-template-columns: minmax(270px, 430px) minmax(100px, 1fr) 46px;
   align-items: center;
   gap: 14px;
   padding: 8px 18px;
@@ -554,12 +636,33 @@ button:disabled {
   background: var(--surface);
 }
 
-.location-label {
+.reading-stats {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
   overflow: hidden;
-  color: var(--muted);
+  white-space: nowrap;
+}
+
+.location-label,
+.page-stat {
+  overflow: hidden;
   font-size: 0.78rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.location-label {
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 680;
+}
+
+.page-stat {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .progress-bar input {
@@ -647,7 +750,7 @@ button:disabled {
 
   .book-labels h1,
   .book-labels p {
-    max-width: calc(100vw - 76px);
+    max-width: calc(100vw - 126px);
   }
 
   .toolbar-actions {
@@ -676,12 +779,22 @@ button:disabled {
 
   .progress-bar {
     grid-template-columns: minmax(0, 1fr) 42px;
+    grid-template-rows: auto auto;
     gap: 8px;
     padding: 7px 10px;
   }
 
-  .location-label {
-    display: none;
+  .reading-stats {
+    grid-column: 1 / -1;
+    gap: 8px;
+  }
+
+  .progress-bar input {
+    grid-column: 1;
+  }
+
+  .progress-bar output {
+    grid-column: 2;
   }
 }
 

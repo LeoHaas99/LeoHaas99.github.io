@@ -28,6 +28,29 @@
               <path d="M4 6h2M9 6h11M4 12h2M9 12h11M4 18h2M9 18h11" />
             </svg>
           </button>
+          <div id="recent-menu" class="recent-menu">
+            <button
+              id="recent-toggle"
+              class="icon-button"
+              type="button"
+              aria-label="Open recent books"
+              title="Recent books"
+              aria-controls="recent-panel"
+              aria-expanded="false"
+              disabled
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 5h11M4 10h8M4 15h6M17 12v5l3 2M17 22a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z" />
+              </svg>
+            </button>
+            <section id="recent-panel" class="recent-panel" aria-label="Recent books" hidden>
+              <div class="recent-header">
+                <strong>Recent books</strong>
+                <span>Stored file access stays on this device</span>
+              </div>
+              <ol id="recent-list" class="recent-list"></ol>
+            </section>
+          </div>
           <div class="book-labels">
             <h1 id="book-title">EPUB Reader</h1>
             <p id="chapter-title">Open a book to begin</p>
@@ -136,7 +159,11 @@
       </main>
 
       <footer id="progress-bar" class="progress-bar" hidden>
-        <span id="location-label" class="location-label">Finding your place…</span>
+        <div class="reading-stats" aria-live="polite">
+          <span id="location-label" class="location-label">Finding your place…</span>
+          <span id="chapter-stats" class="page-stat">Chapter —</span>
+          <span id="book-stats" class="page-stat" title="Full-book count uses stable EPUB virtual pages">Book —</span>
+        </div>
         <label class="visually-hidden" for="progress">Reading progress</label>
         <input id="progress" type="range" min="0" max="100" step="0.1" value="0" disabled />
         <output id="progress-value" for="progress">—%</output>

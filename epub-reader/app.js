@@ -1,7 +1,11 @@
 const PREFS_KEY = "epub-reader:prefs:v1";
 const POSITION_PREFIX = "epub-reader:position:";
+const RECENT_BOOKS_KEY = "epub-reader:recent:v1";
+const RECENT_BOOKS_LIMIT = 5;
+const HANDLE_DATABASE_NAME = "epub-reader-files-v1";
+const HANDLE_STORE_NAME = "book-handles";
 const FONT_MIN = 80;
-const FONT_MAX = 300;
+const FONT_MAX = 600;
 const FONT_STEP = 10;
 const READER_WIDTH_MIN = 10;
 const READER_WIDTH_MAX = 100;
@@ -32,6 +36,10 @@ const elements = {
   tocBackdrop: document.querySelector("#toc-backdrop"),
   tocClose: document.querySelector("#toc-close"),
   tocList: document.querySelector("#toc-list"),
+  recentMenu: document.querySelector("#recent-menu"),
+  recentToggle: document.querySelector("#recent-toggle"),
+  recentPanel: document.querySelector("#recent-panel"),
+  recentList: document.querySelector("#recent-list"),
   fontDecrease: document.querySelector("#font-decrease"),
   fontIncrease: document.querySelector("#font-increase"),
   fontSize: document.querySelector("#font-size"),
@@ -43,18 +51,26 @@ const elements = {
   progress: document.querySelector("#progress"),
   progressValue: document.querySelector("#progress-value"),
   locationLabel: document.querySelector("#location-label"),
+  chapterStats: document.querySelector("#chapter-stats"),
+  bookStats: document.querySelector("#book-stats"),
   dropOverlay: document.querySelector("#drop-overlay"),
 };
 
 const storageAvailableAtStart = detectStorage();
 const initialPreferences = loadPreferences(storageAvailableAtStart);
+const initialRecentBooks = loadRecentBooks(storageAvailableAtStart);
 
 const state = {
   book: null,
   rendition: null,
   fingerprint: null,
   metadata: null,
+  displayTitle: "",
+  fileName: "",
+  hasFileHandle: false,
   tocEntries: [],
+  recentBooks: initialRecentBooks,
+  recentHandles: new Map(),
   currentLocation: null,
   currentChapter: "",
   locationsReady: false,
@@ -74,6 +90,8 @@ const state = {
 };
 
 class ReaderError extends Error {}
+
+let handleDatabasePromise = null;
 
 function detectStorage() {
   try {
@@ -113,6 +131,38 @@ function loadPreferences(canUseStorage) {
   }
 }
 
+function loadRecentBooks(canUseStorage) {
+  if (!canUseStorage) return [];
+
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(RECENT_BOOKS_KEY) || "[]");
+    if (!Array.isArray(saved)) return [];
+
+    return saved
+      .filter(
+        (record) =>
+          record &&
+          typeof record.fingerprint === "string" &&
+          /^[a-f\d]{64}$/i.test(record.fingerprint) &&
+          typeof record.title === "string" &&
+          record.title.trim(),
+      )
+      .slice(0, RECENT_BOOKS_LIMIT)
+      .map((record) => ({
+        fingerprint: record.fingerprint,
+        title: record.title.trim(),
+        fileName: typeof record.fileName === "string" ? record.fileName : "",
+        percentage: Number.isFinite(record.percentage)
+          ? clamp(record.percentage, 0, 1)
+          : null,
+        updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : "",
+        hasHandle: Boolean(record.hasHandle),
+      }));
+  } catch {
+    return [];
+  }
+}
+
 function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
 }
@@ -124,6 +174,82 @@ function withTimeout(promise, milliseconds, message) {
   });
 
   return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timer));
+}
+
+function openHandleDatabase() {
+  if (!("indexedDB" in window)) {
+    return Promise.reject(new Error("IndexedDB is unavailable."));
+  }
+  if (handleDatabasePromise) return handleDatabasePromise;
+
+  handleDatabasePromise = new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(HANDLE_DATABASE_NAME, 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(HANDLE_STORE_NAME)) {
+        request.result.createObjectStore(HANDLE_STORE_NAME);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("Could not open file-handle storage."));
+  });
+
+  handleDatabasePromise.catch(() => {
+    handleDatabasePromise = null;
+  });
+  return handleDatabasePromise;
+}
+
+async function readStoredFileHandle(fingerprint) {
+  try {
+    const database = await openHandleDatabase();
+    return await new Promise((resolve, reject) => {
+      const transaction = database.transaction(HANDLE_STORE_NAME, "readonly");
+      const request = transaction.objectStore(HANDLE_STORE_NAME).get(fingerprint);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (error) {
+    console.warn("Could not read a saved file handle.", error);
+    return null;
+  }
+}
+
+async function storeFileHandle(fingerprint, handle) {
+  if (!fingerprint || !handle || handle.kind !== "file") return false;
+
+  try {
+    const database = await openHandleDatabase();
+    await new Promise((resolve, reject) => {
+      const transaction = database.transaction(HANDLE_STORE_NAME, "readwrite");
+      transaction.objectStore(HANDLE_STORE_NAME).put(handle, fingerprint);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    state.recentHandles.set(fingerprint, handle);
+    return true;
+  } catch (error) {
+    console.warn("Could not save a file handle for direct reopening.", error);
+    return false;
+  }
+}
+
+async function hydrateRecentHandles() {
+  let changed = false;
+  await Promise.all(
+    state.recentBooks.map(async (record) => {
+      if (!record.hasHandle) return;
+      const handle = await readStoredFileHandle(record.fingerprint);
+      if (handle?.kind === "file") {
+        state.recentHandles.set(record.fingerprint, handle);
+      } else {
+        record.hasHandle = false;
+        changed = true;
+      }
+    }),
+  );
+  if (changed) saveRecentBooks();
+  renderRecentBooks();
 }
 
 function showNotice(message, kind = "info", autoHideAfter = 0) {
@@ -195,6 +321,76 @@ function savePreferences() {
   }
 }
 
+function saveRecentBooks() {
+  if (!state.storageAvailable) return;
+
+  try {
+    window.localStorage.setItem(RECENT_BOOKS_KEY, JSON.stringify(state.recentBooks));
+  } catch {
+    markPersistenceUnavailable();
+  }
+}
+
+function renderRecentBooks() {
+  elements.recentList.replaceChildren();
+
+  for (const record of state.recentBooks) {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    const title = document.createElement("span");
+    const detail = document.createElement("span");
+    const percentage = Number.isFinite(record.percentage)
+      ? `${Math.round(record.percentage * 100)}% read`
+      : "Position saved";
+    const canReopen = record.hasHandle && state.recentHandles.has(record.fingerprint);
+
+    button.type = "button";
+    button.className = "recent-book-button";
+    button.title = record.title;
+    button.setAttribute(
+      "aria-label",
+      canReopen ? `Open ${record.title}` : `Select ${record.title} from your device`,
+    );
+    title.className = "recent-book-title";
+    title.textContent = record.title;
+    detail.className = "recent-book-detail";
+    detail.textContent = `${percentage} · ${canReopen ? "Ready to open" : record.fileName || "Reselect file"}`;
+
+    button.append(title, detail);
+    button.addEventListener("click", () => void openRecentBook(record));
+    item.append(button);
+    elements.recentList.append(item);
+  }
+
+  elements.recentToggle.disabled = state.busy || state.recentBooks.length === 0;
+}
+
+function rememberCurrentBook(percentage = null, updatedAt = new Date().toISOString()) {
+  if (!state.fingerprint || !state.displayTitle) return;
+
+  const existing = state.recentBooks.find(
+    (record) => record.fingerprint === state.fingerprint,
+  );
+  const recentBook = {
+    fingerprint: state.fingerprint,
+    title: state.displayTitle,
+    fileName: state.fileName,
+    percentage: Number.isFinite(percentage)
+      ? clamp(percentage, 0, 1)
+      : existing?.percentage ?? null,
+    updatedAt,
+    hasHandle: state.hasFileHandle || existing?.hasHandle || false,
+  };
+
+  state.recentBooks = [
+    recentBook,
+    ...state.recentBooks.filter((record) => record.fingerprint !== state.fingerprint),
+  ].slice(0, RECENT_BOOKS_LIMIT);
+
+  saveRecentBooks();
+  renderRecentBooks();
+}
+
 function readSavedPosition(fingerprint) {
   if (!state.storageAvailable || !fingerprint) return null;
 
@@ -215,20 +411,26 @@ function readSavedPosition(fingerprint) {
 }
 
 function saveCurrentPosition(cfi, percentage) {
-  if (!state.storageAvailable || !state.fingerprint || !cfi) return;
+  if (!state.fingerprint || !cfi) return;
 
-  try {
-    window.localStorage.setItem(
-      `${POSITION_PREFIX}${state.fingerprint}`,
-      JSON.stringify({
-        cfi,
-        percentage: Number.isFinite(percentage) ? percentage : null,
-        updatedAt: new Date().toISOString(),
-      }),
-    );
-  } catch {
-    markPersistenceUnavailable();
+  const updatedAt = new Date().toISOString();
+
+  if (state.storageAvailable) {
+    try {
+      window.localStorage.setItem(
+        `${POSITION_PREFIX}${state.fingerprint}`,
+        JSON.stringify({
+          cfi,
+          percentage: Number.isFinite(percentage) ? percentage : null,
+          updatedAt,
+        }),
+      );
+    } catch {
+      markPersistenceUnavailable();
+    }
   }
+
+  rememberCurrentBook(percentage, updatedAt);
 }
 
 async function fingerprintBuffer(buffer) {
@@ -381,6 +583,7 @@ function updateControlStates() {
   elements.openBook.disabled = state.busy;
   elements.landingOpenBook.disabled = state.busy;
   elements.fileInput.disabled = state.busy;
+  elements.recentToggle.disabled = state.busy || state.recentBooks.length === 0;
   elements.tocToggle.disabled = state.busy || !hasBook || state.tocEntries.length === 0;
   elements.previousPage.disabled = state.busy || !hasBook || state.atStart;
   elements.nextPage.disabled = state.busy || !hasBook || state.atEnd;
@@ -405,10 +608,74 @@ function setBusy(isBusy, label = "Opening book…") {
   updateControlStates();
 }
 
-function promptForFile() {
+async function promptForFile() {
   if (state.busy) return;
+  closeRecentBooks(false);
+
+  if (typeof window.showOpenFilePicker === "function" && window.isSecureContext) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        id: "epub-reader-books",
+        multiple: false,
+        types: [
+          {
+            description: "EPUB and Kobo EPUB books",
+            accept: {
+              "application/epub+zip": [".epub", ".kepub", ".epu"],
+            },
+          },
+        ],
+      });
+      if (!handle) return;
+      const file = await handle.getFile();
+      await openFile(file, handle);
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") return;
+      console.warn("The persistent file picker was unavailable.", error);
+      showNotice("Direct file access is unavailable here. Use the standard file picker instead.", "warning", 4500);
+    }
+  }
+
   elements.fileInput.value = "";
   elements.fileInput.click();
+}
+
+async function openRecentBook(record) {
+  if (state.busy) return;
+  closeRecentBooks(false);
+
+  const handle =
+    state.recentHandles.get(record.fingerprint) ||
+    (record.hasHandle ? await readStoredFileHandle(record.fingerprint) : null);
+
+  if (!handle?.getFile) {
+    showNotice(`Select “${record.title}” again to restore its saved position.`, "info", 5000);
+    await promptForFile();
+    return;
+  }
+
+  state.recentHandles.set(record.fingerprint, handle);
+
+  try {
+    let permission =
+      typeof handle.queryPermission === "function"
+        ? await handle.queryPermission({ mode: "read" })
+        : "prompt";
+    if (permission !== "granted" && typeof handle.requestPermission === "function") {
+      permission = await handle.requestPermission({ mode: "read" });
+    }
+    if (permission === "denied") {
+      showNotice("Permission to reopen that book was not granted.", "warning", 4500);
+      return;
+    }
+
+    const file = await handle.getFile();
+    await openFile(file, handle);
+  } catch (error) {
+    console.warn("Could not reopen the recent book.", error);
+    showNotice("That recent file was moved, deleted, or is no longer accessible.", "error");
+  }
 }
 
 function validateFile(file) {
@@ -466,7 +733,7 @@ function registerRenditionHandlers(rendition) {
   });
 }
 
-async function openFile(file) {
+async function openFile(file, fileHandle = null) {
   if (state.busy) {
     showNotice("Please wait for the current book to finish opening.", "warning", 3000);
     return;
@@ -550,6 +817,10 @@ async function openFile(file) {
       await candidateRendition.display();
     }
 
+    const hasFileHandle = fileHandle
+      ? await storeFileHandle(fingerprint, fileHandle)
+      : state.recentHandles.has(fingerprint);
+
     promoteCandidate({
       book: candidateBook,
       rendition: candidateRendition,
@@ -557,6 +828,7 @@ async function openFile(file) {
       metadata,
       navigation,
       file,
+      hasFileHandle,
     });
 
     candidateBook = null;
@@ -624,6 +896,7 @@ function promoteCandidate({
   metadata,
   navigation,
   file,
+  hasFileHandle,
 }) {
   const previousBook = state.book;
   const previousRendition = state.rendition;
@@ -632,6 +905,8 @@ function promoteCandidate({
   state.rendition = rendition;
   state.fingerprint = fingerprint;
   state.metadata = metadata || {};
+  state.fileName = file.name;
+  state.hasFileHandle = hasFileHandle;
   state.locationsReady = false;
   state.currentLocation = null;
   state.currentChapter = "";
@@ -642,6 +917,7 @@ function promoteCandidate({
   const displayTitle =
     `${metadata?.title || ""}`.trim() ||
     file.name.replace(/(?:\.kepub)?\.epub$|\.kepub$|\.epu$/i, "");
+  state.displayTitle = displayTitle;
   elements.bookTitle.textContent = displayTitle;
   elements.chapterTitle.textContent = "Finding your place…";
 
@@ -654,6 +930,9 @@ function promoteCandidate({
   elements.progressValue.value = "—%";
   elements.progressValue.textContent = "—%";
   elements.locationLabel.textContent = "Calculating reading progress…";
+  elements.chapterStats.textContent = "Chapter —";
+  elements.bookStats.textContent = "Book —";
+  rememberCurrentBook();
   syncAppearanceControls();
   updateControlStates();
 
@@ -673,9 +952,8 @@ async function prepareLocations(book, rendition) {
     if (state.book !== book) return;
     console.warn("Could not calculate EPUB locations.", error);
     state.locationsReady = false;
-    elements.locationLabel.textContent = state.currentChapter
-      ? `${state.currentChapter} · Progress unavailable`
-      : "Reading progress unavailable";
+    elements.locationLabel.textContent = state.currentChapter || "Reading";
+    elements.bookStats.textContent = "Book pages unavailable";
     updateControlStates();
     showNotice("The book is open, but its progress slider could not be calculated.", "warning", 4000);
   }
@@ -790,6 +1068,47 @@ function handleRelocated(location) {
     }
   }
 
+  const displayed = location.start.displayed;
+  const chapterPage = Number(displayed?.page);
+  const chapterTotal = Number(displayed?.total);
+  const hasChapterPages =
+    Number.isFinite(chapterPage) &&
+    Number.isFinite(chapterTotal) &&
+    chapterPage > 0 &&
+    chapterTotal > 0;
+  const chapterPercentage = hasChapterPages
+    ? Math.round((chapterPage / chapterTotal) * 100)
+    : null;
+
+  elements.locationLabel.textContent = state.currentChapter || "Reading";
+  elements.chapterStats.textContent = hasChapterPages
+    ? `Chapter ${chapterPage}/${chapterTotal} · ${chapterPercentage}%`
+    : "Chapter —";
+
+  let bookPage = null;
+  let bookTotal = null;
+  if (state.locationsReady && state.book?.locations) {
+    try {
+      bookTotal = Number(state.book.locations.length());
+      const reportedLocation = Number(location.start.location);
+      if (Number.isFinite(reportedLocation)) {
+        bookPage = reportedLocation + 1;
+      } else if (Number.isFinite(percentage) && Number.isFinite(bookTotal)) {
+        bookPage = Math.floor(percentage * Math.max(bookTotal - 1, 0)) + 1;
+      }
+    } catch (error) {
+      console.warn("Could not calculate the full-book page count.", error);
+    }
+  }
+
+  const hasBookPages =
+    Number.isFinite(bookPage) && Number.isFinite(bookTotal) && bookTotal > 0;
+  elements.bookStats.textContent = hasBookPages
+    ? `Book ${clamp(bookPage, 1, bookTotal)}/${bookTotal}`
+    : state.locationsReady
+      ? "Book pages unavailable"
+      : "Book pages calculating…";
+
   if (Number.isFinite(percentage)) {
     const percentageValue = clamp(percentage * 100, 0, 100);
     const roundedPercentage = Math.round(percentageValue);
@@ -797,20 +1116,6 @@ function handleRelocated(location) {
     elements.progressValue.value = `${roundedPercentage}%`;
     elements.progressValue.textContent = `${roundedPercentage}%`;
     elements.progress.setAttribute("aria-valuetext", `${roundedPercentage}% read`);
-    elements.locationLabel.textContent = state.currentChapter
-      ? `${state.currentChapter} · ${roundedPercentage}%`
-      : `${roundedPercentage}% read`;
-  } else {
-    const displayed = location.start.displayed;
-    const localPage = displayed?.page;
-    const localTotal = displayed?.total;
-    const pageLabel =
-      Number.isFinite(localPage) && Number.isFinite(localTotal)
-        ? `Page ${localPage} of ${localTotal} in section`
-        : "Calculating reading progress…";
-    elements.locationLabel.textContent = state.currentChapter
-      ? `${state.currentChapter} · ${pageLabel}`
-      : pageLabel;
   }
 
   saveCurrentPosition(location.start.cfi, percentage);
@@ -850,13 +1155,13 @@ function handleReaderKeydown(event) {
   if (event.ctrlKey || event.altKey || event.metaKey) return;
   if (isInteractiveTarget(event.target)) return;
 
-  if (event.key === "ArrowLeft") {
+  if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
     event.preventDefault();
     enqueueNavigation("prev");
     return;
   }
 
-  if (event.key === "ArrowRight") {
+  if (event.key === "ArrowRight" || event.key === "ArrowDown") {
     event.preventDefault();
     enqueueNavigation("next");
     return;
@@ -868,8 +1173,27 @@ function handleReaderKeydown(event) {
   }
 }
 
+function toggleRecentBooks() {
+  if (elements.recentToggle.disabled) return;
+  if (elements.recentPanel.hidden) {
+    closeTableOfContents(false);
+    elements.recentPanel.hidden = false;
+    elements.recentToggle.setAttribute("aria-expanded", "true");
+  } else {
+    closeRecentBooks();
+  }
+}
+
+function closeRecentBooks(restoreFocus = true) {
+  const wasOpen = !elements.recentPanel.hidden;
+  elements.recentPanel.hidden = true;
+  elements.recentToggle.setAttribute("aria-expanded", "false");
+  if (wasOpen && restoreFocus) elements.recentToggle.focus();
+}
+
 function openTableOfContents() {
   if (elements.tocToggle.disabled) return;
+  closeRecentBooks(false);
   elements.tocPanel.classList.add("is-open");
   elements.tocPanel.setAttribute("aria-hidden", "false");
   elements.tocBackdrop.hidden = false;
@@ -959,7 +1283,7 @@ function handleDragLeave(event) {
   if (dragDepth === 0) elements.dropOverlay.classList.remove("is-visible");
 }
 
-function handleDrop(event) {
+async function handleDrop(event) {
   if (!isFileDrag(event)) return;
   event.preventDefault();
   dragDepth = 0;
@@ -971,7 +1295,16 @@ function handleDrop(event) {
     return;
   }
 
-  void openFile(files[0]);
+  const item = Array.from(event.dataTransfer?.items || []).find(
+    (candidate) => candidate.kind === "file",
+  );
+  const handlePromise =
+    typeof item?.getAsFileSystemHandle === "function"
+      ? item.getAsFileSystemHandle().catch(() => null)
+      : Promise.resolve(null);
+  const handle = await handlePromise;
+  const file = handle?.kind === "file" ? await handle.getFile() : files[0];
+  void openFile(file, handle?.kind === "file" ? handle : null);
 }
 
 function nextFrame() {
@@ -980,6 +1313,8 @@ function nextFrame() {
 
 function initialize() {
   syncAppearanceControls();
+  renderRecentBooks();
+  void hydrateRecentHandles();
   restoreBaselineNotice();
 
   elements.openBook.addEventListener("click", promptForFile);
@@ -992,6 +1327,7 @@ function initialize() {
   elements.previousPage.addEventListener("click", () => enqueueNavigation("prev"));
   elements.nextPage.addEventListener("click", () => enqueueNavigation("next"));
   elements.tocToggle.addEventListener("click", openTableOfContents);
+  elements.recentToggle.addEventListener("click", toggleRecentBooks);
   elements.tocClose.addEventListener("click", () => closeTableOfContents());
   elements.tocBackdrop.addEventListener("click", () => closeTableOfContents());
   elements.fontDecrease.addEventListener("click", () => changeFontSize(-1));
@@ -1006,6 +1342,12 @@ function initialize() {
   elements.progress.addEventListener("change", () => void seekToProgress());
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !elements.recentPanel.hidden) {
+      event.preventDefault();
+      closeRecentBooks();
+      return;
+    }
+
     if (event.key === "Escape" && elements.tocPanel.classList.contains("is-open")) {
       event.preventDefault();
       closeTableOfContents();
@@ -1018,6 +1360,11 @@ function initialize() {
   document.addEventListener("dragover", handleDragOver);
   document.addEventListener("dragleave", handleDragLeave);
   document.addEventListener("drop", handleDrop);
+  document.addEventListener("click", (event) => {
+    if (!elements.recentPanel.hidden && !elements.recentMenu.contains(event.target)) {
+      closeRecentBooks(false);
+    }
+  });
   document.addEventListener("dragend", () => {
     dragDepth = 0;
     elements.dropOverlay.classList.remove("is-visible");
@@ -1033,6 +1380,7 @@ function initialize() {
   if (typeof window.ePub !== "function" || typeof window.JSZip !== "function") {
     elements.openBook.disabled = true;
     elements.landingOpenBook.disabled = true;
+    elements.recentToggle.disabled = true;
     showNotice("The EPUB reader libraries could not be loaded.", "error");
     return;
   }
