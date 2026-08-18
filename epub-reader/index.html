@@ -51,6 +51,50 @@
               <ol id="recent-list" class="recent-list"></ol>
             </section>
           </div>
+          <div id="search-menu" class="search-menu">
+            <button
+              id="search-toggle"
+              class="icon-button"
+              type="button"
+              aria-label="Search this book"
+              title="Search this book"
+              aria-controls="search-panel"
+              aria-expanded="false"
+              disabled
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="10.5" cy="10.5" r="6.5" />
+                <path d="m15.5 15.5 5 5" />
+              </svg>
+            </button>
+            <section id="search-panel" class="search-panel" aria-label="Search this book" hidden>
+              <form id="search-form" class="search-form" role="search">
+                <label class="visually-hidden" for="search-input">Search book text</label>
+                <input
+                  id="search-input"
+                  type="search"
+                  placeholder="Search this book…"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button class="icon-button" type="submit" aria-label="Search">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="10.5" cy="10.5" r="6.5" />
+                    <path d="m15.5 15.5 5 5" />
+                  </svg>
+                </button>
+                <button id="search-close" class="icon-button" type="button" aria-label="Close search">
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m6 6 12 12M18 6 6 18" />
+                  </svg>
+                </button>
+              </form>
+              <p id="search-status" class="search-status" role="status" aria-live="polite">
+                Enter at least two characters.
+              </p>
+              <ol id="search-results" class="search-results"></ol>
+            </section>
+          </div>
           <div class="book-labels">
             <h1 id="book-title">EPUB Reader</h1>
             <p id="chapter-title">Open a book to begin</p>

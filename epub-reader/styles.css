@@ -70,7 +70,8 @@ button {
 button:focus-visible,
 input:focus-visible,
 .toc-link:focus-visible,
-.recent-book-button:focus-visible {
+.recent-book-button:focus-visible,
+.search-result-button:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent) 72%, transparent);
   outline-offset: 2px;
 }
@@ -115,7 +116,8 @@ button:disabled {
   gap: 10px;
 }
 
-.recent-menu {
+.recent-menu,
+.search-menu {
   position: relative;
   flex: 0 0 auto;
 }
@@ -194,6 +196,100 @@ button:disabled {
 .recent-book-detail {
   color: var(--muted);
   font-size: 0.7rem;
+}
+
+.search-panel {
+  position: fixed;
+  top: calc(var(--toolbar-height) + 8px);
+  left: 112px;
+  z-index: 30;
+  display: grid;
+  width: min(calc(100vw - 128px), 560px);
+  max-height: min(70vh, 560px);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+
+.search-panel[hidden] {
+  display: none;
+}
+
+.search-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px 40px;
+  gap: 6px;
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.search-form input {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 11px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.search-form input::placeholder {
+  color: var(--muted);
+}
+
+.search-status {
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.search-results {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 6px;
+  overflow: auto;
+  list-style: none;
+}
+
+.search-result-button {
+  display: grid;
+  width: 100%;
+  gap: 4px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.search-result-button:hover {
+  background: var(--accent-soft);
+}
+
+.search-result-chapter {
+  overflow: hidden;
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result-excerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.84rem;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .book-labels {
@@ -750,7 +846,13 @@ button:disabled {
 
   .book-labels h1,
   .book-labels p {
-    max-width: calc(100vw - 126px);
+    max-width: calc(100vw - 176px);
+  }
+
+  .search-panel {
+    right: 12px;
+    left: 12px;
+    width: auto;
   }
 
   .toolbar-actions {

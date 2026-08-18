@@ -9,6 +9,7 @@ The EPUB file is never uploaded or copied into browser storage. Display preferen
 - Use the on-screen arrows, `ArrowLeft` / `ArrowRight`, or `ArrowUp` / `ArrowDown` to change pages.
 - Press `Space` for the next page and `Shift+Space` for the previous page.
 - Use the contents button to navigate chapters.
+- Use the top-bar search button to find matching text throughout the book and jump to any result.
 - The footer shows chapter screen count, full-book percentage, full-book virtual page count, and overall progress. Its slider seeks after locations have been calculated.
 - The recent-books button lists the latest five books. In browsers with persistent file-handle support, selecting one reopens it directly.
 - Font size (80–300%), reader width (50–100%), theme, and each book's latest position are remembered on this browser and site.

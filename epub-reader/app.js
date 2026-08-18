@@ -2,6 +2,8 @@ const PREFS_KEY = "epub-reader:prefs:v1";
 const POSITION_PREFIX = "epub-reader:position:";
 const RECENT_BOOKS_KEY = "epub-reader:recent:v1";
 const RECENT_BOOKS_LIMIT = 5;
+const SEARCH_RESULT_LIMIT = 250;
+const SEARCH_DEBOUNCE_MS = 350;
 const HANDLE_DATABASE_NAME = "epub-reader-files-v1";
 const HANDLE_STORE_NAME = "book-handles";
 const FONT_MIN = 80;
@@ -40,6 +42,14 @@ const elements = {
   recentToggle: document.querySelector("#recent-toggle"),
   recentPanel: document.querySelector("#recent-panel"),
   recentList: document.querySelector("#recent-list"),
+  searchMenu: document.querySelector("#search-menu"),
+  searchToggle: document.querySelector("#search-toggle"),
+  searchPanel: document.querySelector("#search-panel"),
+  searchForm: document.querySelector("#search-form"),
+  searchInput: document.querySelector("#search-input"),
+  searchClose: document.querySelector("#search-close"),
+  searchStatus: document.querySelector("#search-status"),
+  searchResults: document.querySelector("#search-results"),
   fontDecrease: document.querySelector("#font-decrease"),
   fontIncrease: document.querySelector("#font-increase"),
   fontSize: document.querySelector("#font-size"),
@@ -71,6 +81,10 @@ const state = {
   tocEntries: [],
   recentBooks: initialRecentBooks,
   recentHandles: new Map(),
+  searchResults: [],
+  searchVersion: 0,
+  searching: false,
+  locationsPromise: null,
   currentLocation: null,
   currentChapter: "",
   locationsReady: false,
@@ -584,6 +598,8 @@ function updateControlStates() {
   elements.landingOpenBook.disabled = state.busy;
   elements.fileInput.disabled = state.busy;
   elements.recentToggle.disabled = state.busy || state.recentBooks.length === 0;
+  elements.searchToggle.disabled = state.busy || !hasBook;
+  elements.searchInput.disabled = state.busy || !hasBook;
   elements.tocToggle.disabled = state.busy || !hasBook || state.tocEntries.length === 0;
   elements.previousPage.disabled = state.busy || !hasBook || state.atStart;
   elements.nextPage.disabled = state.busy || !hasBook || state.atEnd;
@@ -746,6 +762,9 @@ async function openFile(file, fileHandle = null) {
 
   try {
     validateFile(file);
+    state.searchVersion += 1;
+    state.searching = false;
+    closeSearch(false);
     restoreBaselineNotice();
     setBusy(true, `Opening ${file.name}…`);
 
@@ -853,7 +872,8 @@ async function openFile(file, fileHandle = null) {
       restoreBaselineNotice();
     }
 
-    void prepareLocations(state.book, state.rendition);
+    state.locationsPromise = prepareLocations(state.book, state.rendition);
+    void state.locationsPromise;
   } catch (error) {
     console.error("Could not open EPUB.", error);
     destroyBook(candidateBook, candidateRendition);
@@ -910,6 +930,10 @@ function promoteCandidate({
   state.locationsReady = false;
   state.currentLocation = null;
   state.currentChapter = "";
+  state.searchVersion += 1;
+  state.searching = false;
+  state.searchResults = [];
+  state.locationsPromise = null;
   state.atStart = false;
   state.atEnd = false;
   state.navigationQueue = Promise.resolve();
@@ -932,6 +956,10 @@ function promoteCandidate({
   elements.locationLabel.textContent = "Calculating reading progress…";
   elements.chapterStats.textContent = "Chapter —";
   elements.bookStats.textContent = "Book —";
+  elements.searchInput.value = "";
+  elements.searchStatus.textContent = "Enter at least two characters.";
+  elements.searchResults.removeAttribute("aria-busy");
+  renderSearchResults();
   rememberCurrentBook();
   syncAppearanceControls();
   updateControlStates();
@@ -1014,6 +1042,138 @@ function renderTableOfContents(items) {
 
   appendItems(items, elements.tocList);
   updateControlStates();
+}
+
+function chapterLabelForHref(href, sectionIndex) {
+  const sectionHref = normalizeHref(href);
+  const entry = state.tocEntries.find((candidate) => {
+    const candidateHref = normalizeHref(candidate.href);
+    return (
+      candidateHref === sectionHref ||
+      (candidateHref && sectionHref && sectionHref.endsWith(`/${candidateHref}`)) ||
+      (candidateHref && sectionHref && candidateHref.endsWith(`/${sectionHref}`))
+    );
+  });
+
+  return entry?.label || `Section ${sectionIndex + 1}`;
+}
+
+function renderSearchResults() {
+  elements.searchResults.replaceChildren();
+
+  for (const result of state.searchResults) {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    const chapter = document.createElement("span");
+    const excerpt = document.createElement("span");
+
+    button.type = "button";
+    button.className = "search-result-button";
+    button.setAttribute("aria-label", `Open search result in ${result.chapter}`);
+    chapter.className = "search-result-chapter";
+    chapter.textContent = result.chapter;
+    excerpt.className = "search-result-excerpt";
+    excerpt.textContent = result.excerpt;
+
+    button.append(chapter, excerpt);
+    button.addEventListener("click", async () => {
+      const rendition = state.rendition;
+      if (!rendition || state.busy) return;
+      closeSearch(false);
+      try {
+        await rendition.display(result.cfi);
+      } catch (error) {
+        console.error("Could not open the search result.", error);
+        showNotice("That search result could not be opened.", "error");
+      }
+    });
+    item.append(button);
+    elements.searchResults.append(item);
+  }
+}
+
+async function performSearch(rawQuery) {
+  const query = `${rawQuery || ""}`.trim().replace(/\s+/g, " ");
+  const version = ++state.searchVersion;
+  const book = state.book;
+
+  if (query.length < 2) {
+    state.searching = false;
+    state.searchResults = [];
+    renderSearchResults();
+    elements.searchStatus.textContent = "Enter at least two characters.";
+    elements.searchResults.removeAttribute("aria-busy");
+    return;
+  }
+  if (!book) return;
+
+  state.searching = true;
+  state.searchResults = [];
+  renderSearchResults();
+  elements.searchResults.setAttribute("aria-busy", "true");
+  elements.searchStatus.textContent = "Preparing book search…";
+
+  try {
+    if (state.locationsPromise) await state.locationsPromise.catch(() => undefined);
+    if (version !== state.searchVersion || state.book !== book) return;
+
+    const sections = Array.from(book.spine?.spineItems || []);
+    const request = book.load.bind(book);
+    const seenCfis = new Set();
+    let reachedLimit = false;
+
+    for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex += 1) {
+      if (version !== state.searchVersion || state.book !== book) return;
+
+      const section = sections[sectionIndex];
+      elements.searchStatus.textContent = `Searching ${sectionIndex + 1} of ${sections.length}… ${state.searchResults.length} found`;
+
+      try {
+        await section.load(request);
+        if (version !== state.searchVersion || state.book !== book) return;
+
+        const matches = [...section.find(query), ...section.search(query)];
+        const chapter = chapterLabelForHref(section.href, sectionIndex);
+
+        for (const match of matches) {
+          if (!match?.cfi || seenCfis.has(match.cfi)) continue;
+          seenCfis.add(match.cfi);
+          state.searchResults.push({
+            cfi: match.cfi,
+            chapter,
+            excerpt: `${match.excerpt || query}`.replace(/\s+/g, " ").trim(),
+          });
+          if (state.searchResults.length >= SEARCH_RESULT_LIMIT) {
+            reachedLimit = true;
+            break;
+          }
+        }
+      } catch (error) {
+        console.warn(`Could not search EPUB section ${sectionIndex + 1}.`, error);
+      } finally {
+        section.unload();
+      }
+
+      renderSearchResults();
+      if (reachedLimit) break;
+    }
+
+    if (version !== state.searchVersion || state.book !== book) return;
+    elements.searchStatus.textContent = reachedLimit
+      ? `Showing the first ${SEARCH_RESULT_LIMIT} matches.`
+      : state.searchResults.length === 1
+        ? "1 match found."
+        : `${state.searchResults.length} matches found.`;
+  } catch (error) {
+    if (version !== state.searchVersion) return;
+    console.error("Could not search this EPUB.", error);
+    elements.searchStatus.textContent = "This book could not be searched.";
+  } finally {
+    if (version === state.searchVersion) {
+      state.searching = false;
+      elements.searchResults.removeAttribute("aria-busy");
+    }
+  }
 }
 
 function normalizeHref(href) {
@@ -1179,6 +1339,7 @@ function handleReaderKeydown(event) {
 function toggleRecentBooks() {
   if (elements.recentToggle.disabled) return;
   if (elements.recentPanel.hidden) {
+    closeSearch(false);
     closeTableOfContents(false);
     elements.recentPanel.hidden = false;
     elements.recentToggle.setAttribute("aria-expanded", "true");
@@ -1194,9 +1355,38 @@ function closeRecentBooks(restoreFocus = true) {
   if (wasOpen && restoreFocus) elements.recentToggle.focus();
 }
 
+function toggleSearch() {
+  if (elements.searchToggle.disabled) return;
+  if (elements.searchPanel.hidden) {
+    closeRecentBooks(false);
+    closeTableOfContents(false);
+    elements.searchPanel.hidden = false;
+    elements.searchToggle.setAttribute("aria-expanded", "true");
+    window.requestAnimationFrame(() => {
+      elements.searchInput.focus();
+      elements.searchInput.select();
+    });
+  } else {
+    closeSearch();
+  }
+}
+
+function closeSearch(restoreFocus = true) {
+  const wasOpen = !elements.searchPanel.hidden;
+  elements.searchPanel.hidden = true;
+  elements.searchToggle.setAttribute("aria-expanded", "false");
+  if (state.searching) {
+    state.searchVersion += 1;
+    state.searching = false;
+    elements.searchResults.removeAttribute("aria-busy");
+  }
+  if (wasOpen && restoreFocus) elements.searchToggle.focus();
+}
+
 function openTableOfContents() {
   if (elements.tocToggle.disabled) return;
   closeRecentBooks(false);
+  closeSearch(false);
   elements.tocPanel.classList.add("is-open");
   elements.tocPanel.setAttribute("aria-hidden", "false");
   elements.tocBackdrop.hidden = false;
@@ -1314,6 +1504,8 @@ function nextFrame() {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()));
 }
 
+let searchDebounceTimer = 0;
+
 function initialize() {
   syncAppearanceControls();
   renderRecentBooks();
@@ -1331,6 +1523,25 @@ function initialize() {
   elements.nextPage.addEventListener("click", () => enqueueNavigation("next"));
   elements.tocToggle.addEventListener("click", openTableOfContents);
   elements.recentToggle.addEventListener("click", toggleRecentBooks);
+  elements.searchToggle.addEventListener("click", toggleSearch);
+  elements.searchClose.addEventListener("click", () => closeSearch());
+  elements.searchForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    window.clearTimeout(searchDebounceTimer);
+    void performSearch(elements.searchInput.value);
+  });
+  elements.searchInput.addEventListener("input", () => {
+    window.clearTimeout(searchDebounceTimer);
+    const query = elements.searchInput.value;
+    if (query.trim().length < 2) {
+      void performSearch(query);
+      return;
+    }
+    searchDebounceTimer = window.setTimeout(
+      () => void performSearch(query),
+      SEARCH_DEBOUNCE_MS,
+    );
+  });
   elements.tocClose.addEventListener("click", () => closeTableOfContents());
   elements.tocBackdrop.addEventListener("click", () => closeTableOfContents());
   elements.fontDecrease.addEventListener("click", () => changeFontSize(-1));
@@ -1345,6 +1556,12 @@ function initialize() {
   elements.progress.addEventListener("change", () => void seekToProgress());
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !elements.searchPanel.hidden) {
+      event.preventDefault();
+      closeSearch();
+      return;
+    }
+
     if (event.key === "Escape" && !elements.recentPanel.hidden) {
       event.preventDefault();
       closeRecentBooks();
@@ -1367,6 +1584,9 @@ function initialize() {
     if (!elements.recentPanel.hidden && !elements.recentMenu.contains(event.target)) {
       closeRecentBooks(false);
     }
+    if (!elements.searchPanel.hidden && !elements.searchMenu.contains(event.target)) {
+      closeSearch(false);
+    }
   });
   document.addEventListener("dragend", () => {
     dragDepth = 0;
@@ -1384,6 +1604,7 @@ function initialize() {
     elements.openBook.disabled = true;
     elements.landingOpenBook.disabled = true;
     elements.recentToggle.disabled = true;
+    elements.searchToggle.disabled = true;
     showNotice("The EPUB reader libraries could not be loaded.", "error");
     return;
   }
