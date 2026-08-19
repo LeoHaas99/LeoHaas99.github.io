@@ -19,6 +19,7 @@ const MOBILE_LAYOUT_QUERY = "(max-width: 760px), (pointer: coarse)";
 const MOBILE_READING_MODES = new Set(["swipe", "tap", "scroll"]);
 const SWIPE_DISTANCE_MIN = 50;
 const SWIPE_DURATION_MAX = 900;
+const SELECTED_TEXT_MAX = 160;
 
 const elements = {
   app: document.querySelector("#app"),
@@ -78,6 +79,13 @@ const elements = {
   cornerControls: document.querySelector("#corner-controls"),
   cornerPrevious: document.querySelector("#corner-previous"),
   cornerNext: document.querySelector("#corner-next"),
+  selectionActions: document.querySelector("#selection-actions"),
+  selectionLabel: document.querySelector("#selection-label"),
+  selectionTranslateDe: document.querySelector("#selection-translate-de"),
+  selectionMeaningDe: document.querySelector("#selection-meaning-de"),
+  selectionTranslateEn: document.querySelector("#selection-translate-en"),
+  selectionMeaningEn: document.querySelector("#selection-meaning-en"),
+  selectionWikipedia: document.querySelector("#selection-wikipedia"),
 };
 
 const storageAvailableAtStart = detectStorage();
@@ -117,6 +125,8 @@ const state = {
   renditionMode: null,
   navigationQueue: Promise.resolve(),
   noticeVersion: 0,
+  selectedText: "",
+  selectionDocument: null,
 };
 
 class ReaderError extends Error {}
@@ -820,6 +830,13 @@ function registerRenditionHandlers(rendition) {
     contentDocument.addEventListener("touchmove", handleSwipeMove, { passive: false });
     contentDocument.addEventListener("touchend", handleSwipeEnd, { passive: false });
     contentDocument.addEventListener("touchcancel", cancelSwipeGesture);
+    contentDocument.addEventListener("mouseup", () => scheduleSelectionActions(contents, 0));
+    contentDocument.addEventListener("touchend", () => scheduleSelectionActions(contents, 120));
+    contentDocument.addEventListener("keyup", () => scheduleSelectionActions(contents, 0));
+    contentDocument.addEventListener("selectionchange", () =>
+      scheduleSelectionActions(contents, 140),
+    );
+    contentDocument.addEventListener("scroll", () => closeSelectionActions(false), true);
     contentDocument.addEventListener("dragenter", handleDragEnter);
     contentDocument.addEventListener("dragover", handleDragOver);
     contentDocument.addEventListener("dragleave", handleDragLeave);
@@ -827,7 +844,10 @@ function registerRenditionHandlers(rendition) {
   });
 
   rendition.on("relocated", (location) => {
-    if (state.rendition === rendition) handleRelocated(location);
+    if (state.rendition === rendition) {
+      closeSelectionActions(false);
+      handleRelocated(location);
+    }
   });
 }
 
@@ -836,6 +856,8 @@ async function openFile(file, fileHandle = null) {
     showNotice("Please wait for the current book to finish opening.", "warning", 3000);
     return;
   }
+
+  closeSelectionActions(true);
 
   let candidateBook = null;
   let candidateRendition = null;
@@ -1507,6 +1529,160 @@ function enqueueNavigation(direction) {
     });
 }
 
+function normalizeSelectedText(value) {
+  return `${value || ""}`
+    .replace(/\u00ad/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, SELECTED_TEXT_MAX);
+}
+
+function selectionViewportRect(contents, range) {
+  const frame = contents?.window?.frameElement || contents?.document?.defaultView?.frameElement;
+  if (!frame?.isConnected) return null;
+
+  const rangeRect = range.getBoundingClientRect();
+  const fallbackRect = Array.from(range.getClientRects()).find(
+    (rect) => rect.width > 0 && rect.height > 0,
+  );
+  const selectedRect =
+    rangeRect.width > 0 && rangeRect.height > 0 ? rangeRect : fallbackRect;
+  if (!selectedRect) return null;
+
+  const frameRect = frame.getBoundingClientRect();
+  return {
+    left: frameRect.left + selectedRect.left,
+    right: frameRect.left + selectedRect.right,
+    top: frameRect.top + selectedRect.top,
+    bottom: frameRect.top + selectedRect.bottom,
+    width: selectedRect.width,
+    height: selectedRect.height,
+  };
+}
+
+let selectionActionsTimer = 0;
+
+function scheduleSelectionActions(contents, delay = 0) {
+  window.clearTimeout(selectionActionsTimer);
+  selectionActionsTimer = window.setTimeout(() => showSelectionActions(contents), delay);
+}
+
+function showSelectionActions(contents) {
+  if (!state.rendition || state.busy) {
+    closeSelectionActions(false);
+    return;
+  }
+
+  const contentDocument = contents?.document;
+  const selection = contentDocument?.getSelection?.();
+  if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+    closeSelectionActions(false);
+    return;
+  }
+
+  const selectedText = normalizeSelectedText(selection.toString());
+  if (!selectedText) {
+    closeSelectionActions(false);
+    return;
+  }
+
+  let selectedRect = null;
+  try {
+    selectedRect = selectionViewportRect(contents, selection.getRangeAt(0));
+  } catch (error) {
+    console.warn("Could not position the selected-text actions.", error);
+  }
+  if (!selectedRect) {
+    closeSelectionActions(false);
+    return;
+  }
+
+  state.selectedText = selectedText;
+  state.selectionDocument = contentDocument;
+  elements.selectionLabel.textContent = `\u201c${selectedText}\u201d`;
+  elements.selectionActions.hidden = false;
+  elements.selectionActions.style.visibility = "hidden";
+
+  window.requestAnimationFrame(() => {
+    if (state.selectedText !== selectedText || elements.selectionActions.hidden) return;
+
+    const popup = elements.selectionActions.getBoundingClientRect();
+    const readerRect = elements.reader.getBoundingClientRect();
+    const anchorX = selectedRect.left + selectedRect.width / 2;
+    const minimumTop = Math.max(8, readerRect.top + 6);
+    const maximumTop = Math.max(minimumTop, readerRect.bottom - popup.height - 6);
+    let placement = "above";
+    let top = selectedRect.top - popup.height - 10;
+
+    if (top < minimumTop) {
+      placement = "below";
+      top = selectedRect.bottom + 10;
+    }
+
+    top = clamp(top, minimumTop, maximumTop);
+    const left = clamp(anchorX - popup.width / 2, 8, window.innerWidth - popup.width - 8);
+    const arrowLeft = clamp(anchorX - left, 14, popup.width - 14);
+
+    elements.selectionActions.style.left = `${left}px`;
+    elements.selectionActions.style.top = `${top}px`;
+    elements.selectionActions.style.setProperty("--selection-arrow-left", `${arrowLeft}px`);
+    elements.selectionActions.dataset.placement = placement;
+    elements.selectionActions.style.visibility = "visible";
+  });
+}
+
+function closeSelectionActions(clearBookSelection = false) {
+  window.clearTimeout(selectionActionsTimer);
+  elements.selectionActions.hidden = true;
+  elements.selectionActions.style.visibility = "";
+  delete elements.selectionActions.dataset.placement;
+
+  const contentDocument = state.selectionDocument;
+  state.selectedText = "";
+  state.selectionDocument = null;
+
+  if (clearBookSelection) {
+    try {
+      contentDocument?.getSelection?.()?.removeAllRanges();
+    } catch (error) {
+      console.warn("Could not clear the book selection.", error);
+    }
+  }
+}
+
+function wikipediaLanguage() {
+  const match = `${window.navigator.language || ""}`.toLowerCase().match(/^[a-z]{2,3}/);
+  const language = match?.[0] || "en";
+  return language === "und" ? "en" : language;
+}
+
+function openSelectedTextLookup(kind) {
+  const selectedText = state.selectedText;
+  if (!selectedText) return;
+
+  const googleSuffix = {
+    "translate-de": "\u00fcbersetzen",
+    "meaning-de": "bedeutung",
+    "translate-en": "translation",
+    "meaning-en": "meaning",
+  }[kind];
+  let url = "";
+  if (googleSuffix) {
+    url = `https://www.google.com/search?q=${encodeURIComponent(
+      `${selectedText} ${googleSuffix}`,
+    )}`;
+  } else if (kind === "wikipedia") {
+    const language = wikipediaLanguage();
+    url = `https://${language}.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(
+      selectedText,
+    )}`;
+  }
+
+  if (!url) return;
+  window.open(url, "_blank", "noopener,noreferrer");
+  closeSelectionActions(true);
+}
+
 function isInteractiveTarget(target) {
   if (!target || target.nodeType !== Node.ELEMENT_NODE) return false;
   if (target.isContentEditable) return true;
@@ -1594,6 +1770,13 @@ function cancelSwipeGesture() {
 
 function handleReaderKeydown(event) {
   if (!state.rendition || state.busy || event.defaultPrevented) return;
+
+  if (event.key === "Escape" && !elements.selectionActions.hidden) {
+    event.preventDefault();
+    closeSelectionActions(true);
+    return;
+  }
+
   if (event.ctrlKey || event.altKey || event.metaKey) return;
   if (isInteractiveTarget(event.target)) return;
 
@@ -1751,6 +1934,7 @@ async function toggleFullscreen() {
 }
 
 function updateFullscreenControl() {
+  closeSelectionActions(false);
   const isFullscreen = document.fullscreenElement === elements.app;
   elements.fullscreenToggle.setAttribute("aria-pressed", `${isFullscreen}`);
   elements.fullscreenToggle.setAttribute(
@@ -1835,6 +2019,21 @@ function initialize() {
   elements.nextPage.addEventListener("click", () => enqueueNavigation("next"));
   elements.cornerPrevious.addEventListener("click", () => enqueueNavigation("prev"));
   elements.cornerNext.addEventListener("click", () => enqueueNavigation("next"));
+  elements.selectionTranslateDe.addEventListener("click", () =>
+    openSelectedTextLookup("translate-de"),
+  );
+  elements.selectionMeaningDe.addEventListener("click", () =>
+    openSelectedTextLookup("meaning-de"),
+  );
+  elements.selectionTranslateEn.addEventListener("click", () =>
+    openSelectedTextLookup("translate-en"),
+  );
+  elements.selectionMeaningEn.addEventListener("click", () =>
+    openSelectedTextLookup("meaning-en"),
+  );
+  elements.selectionWikipedia.addEventListener("click", () =>
+    openSelectedTextLookup("wikipedia"),
+  );
   elements.tocToggle.addEventListener("click", openTableOfContents);
   elements.recentToggle.addEventListener("click", toggleRecentBooks);
   elements.searchToggle.addEventListener("click", toggleSearch);
@@ -1923,6 +2122,9 @@ function initialize() {
     ) {
       closeMobileReadingMenu(false);
     }
+    if (!elements.selectionActions.hidden && !elements.selectionActions.contains(event.target)) {
+      closeSelectionActions(true);
+    }
   });
   document.addEventListener("dragend", () => {
     dragDepth = 0;
@@ -1932,6 +2134,7 @@ function initialize() {
 
   let resizeTimer = 0;
   window.addEventListener("resize", () => {
+    closeSelectionActions(false);
     window.clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => {
       updateControlStates();

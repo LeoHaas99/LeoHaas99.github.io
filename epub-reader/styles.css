@@ -524,6 +524,89 @@ button:disabled {
   color: var(--danger);
 }
 
+.selection-actions {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  max-width: calc(100vw - 16px);
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow);
+}
+
+.selection-actions[hidden] {
+  display: none;
+}
+
+.selection-actions::after {
+  position: absolute;
+  top: 100%;
+  left: var(--selection-arrow-left, 50%);
+  width: 10px;
+  height: 10px;
+  border-right: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--surface-raised);
+  content: "";
+  transform: translate(-50%, -5px) rotate(45deg);
+}
+
+.selection-actions[data-placement="below"]::after {
+  top: auto;
+  bottom: 100%;
+  border: 0;
+  border-top: 1px solid var(--border-strong);
+  border-left: 1px solid var(--border-strong);
+  transform: translate(-50%, 5px) rotate(45deg);
+}
+
+.selection-label {
+  max-width: 150px;
+  overflow: hidden;
+  padding: 0 7px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 0.78rem;
+  font-style: italic;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selection-actions button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 680;
+}
+
+.selection-actions button:hover,
+.selection-actions button:focus-visible {
+  background: var(--accent-soft);
+}
+
+.selection-actions svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
 .main-area,
 .reader,
 .page-stage,
@@ -1001,6 +1084,15 @@ button:disabled {
   .viewer-shell {
     width: 100%;
     min-width: 0;
+  }
+
+  .selection-label {
+    display: none;
+  }
+
+  .selection-actions button {
+    min-height: 40px;
+    padding: 0 10px;
   }
 
   .progress-bar {

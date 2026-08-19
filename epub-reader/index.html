@@ -193,6 +193,48 @@
 
       <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
 
+      <div
+        id="selection-actions"
+        class="selection-actions"
+        role="toolbar"
+        aria-label="Selected text actions"
+        hidden
+      >
+        <span id="selection-label" class="selection-label"></span>
+        <button id="selection-translate-de" type="button" title="Google the selected text plus übersetzen">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 5h9M8.5 3v2M6 8c1.1 2.5 3 4.5 6 6M12 8c-1.2 2.8-3.8 5.2-7 7M14 20l3-8 3 8M15 17h4" />
+          </svg>
+          <span>Übersetzen</span>
+        </button>
+        <button id="selection-meaning-de" type="button" title="Google the selected text plus bedeutung">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="6.5" />
+            <path d="m15.5 15.5 5 5" />
+          </svg>
+          <span>Bedeutung</span>
+        </button>
+        <button id="selection-translate-en" type="button" title="Google the selected text plus translation">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 5h9M8.5 3v2M6 8c1.1 2.5 3 4.5 6 6M12 8c-1.2 2.8-3.8 5.2-7 7M14 20l3-8 3 8M15 17h4" />
+          </svg>
+          <span>Translation</span>
+        </button>
+        <button id="selection-meaning-en" type="button" title="Google the selected text plus meaning">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="6.5" />
+            <path d="m15.5 15.5 5 5" />
+          </svg>
+          <span>Meaning</span>
+        </button>
+        <button id="selection-wikipedia" type="button" title="Search Wikipedia in a new tab">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M3 5h4M17 5h4M5 5l5.5 14M19 5l-5.5 14M8.5 5h7M7.8 13h8.4" />
+          </svg>
+          <span>Wikipedia</span>
+        </button>
+      </div>
+
       <main class="main-area">
         <section id="landing" class="landing" aria-labelledby="landing-title">
           <div id="drop-zone" class="drop-zone">
