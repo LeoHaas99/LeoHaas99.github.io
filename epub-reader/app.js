@@ -20,6 +20,7 @@ const MOBILE_READING_MODES = new Set(["swipe", "tap", "scroll"]);
 const SWIPE_DISTANCE_MIN = 50;
 const SWIPE_DURATION_MAX = 900;
 const SELECTED_TEXT_MAX = 160;
+const MOBILE_EDGE_REGION = 0.28;
 
 const elements = {
   app: document.querySelector("#app"),
@@ -76,9 +77,6 @@ const elements = {
   bookStats: document.querySelector("#book-stats"),
   dropOverlay: document.querySelector("#drop-overlay"),
   viewerShell: document.querySelector(".viewer-shell"),
-  cornerControls: document.querySelector("#corner-controls"),
-  cornerPrevious: document.querySelector("#corner-previous"),
-  cornerNext: document.querySelector("#corner-next"),
   selectionActions: document.querySelector("#selection-actions"),
   selectionLabel: document.querySelector("#selection-label"),
   selectionTranslateDe: document.querySelector("#selection-translate-de"),
@@ -127,6 +125,7 @@ const state = {
   noticeVersion: 0,
   selectedText: "",
   selectionDocument: null,
+  mobileControlsVisible: true,
 };
 
 class ReaderError extends Error {}
@@ -600,22 +599,80 @@ function renditionOptions(mode) {
   };
 }
 
+function stripScriptedEpubContent(contentDocument) {
+  if (!contentDocument?.querySelectorAll) return;
+
+  for (const script of contentDocument.querySelectorAll("script")) {
+    script.remove();
+  }
+
+  const scriptUrlAttributes = new Set([
+    "action",
+    "formaction",
+    "href",
+    "src",
+    "xlink:href",
+  ]);
+
+  for (const element of contentDocument.querySelectorAll("*")) {
+    for (const attribute of Array.from(element.attributes || [])) {
+      const name = attribute.name.toLowerCase();
+      if (
+        name.startsWith("on") ||
+        name === "srcdoc" ||
+        (scriptUrlAttributes.has(name) &&
+          /^\s*javascript\s*:/i.test(attribute.value))
+      ) {
+        element.removeAttributeNode(attribute);
+      }
+    }
+  }
+}
+
+function registerBookSecurityHooks(book) {
+  book?.spine?.hooks?.content?.register(stripScriptedEpubContent);
+}
+
 function syncMobileReadingControls() {
   const isMobile = isMobileLayout();
-  const showCornerControls =
-    isMobile &&
-    state.mobileReadingMode === "tap" &&
-    state.renditionMode === "paginated" &&
-    Boolean(state.rendition);
 
   elements.app.dataset.mobileReadingMode = state.mobileReadingMode;
   elements.app.dataset.renditionMode = state.renditionMode || desiredRenditionMode();
-  elements.cornerControls.hidden = !showCornerControls;
+  elements.app.dataset.mobileControls =
+    isMobile && !state.mobileControlsVisible ? "hidden" : "visible";
 
   for (const input of elements.mobileReadingModes) {
     input.checked = input.value === state.mobileReadingMode;
     input.disabled = state.busy;
   }
+}
+
+function setMobileControlsVisible(isVisible) {
+  if (!isMobileLayout()) return;
+
+  const nextValue = Boolean(isVisible);
+  if (state.mobileControlsVisible === nextValue) return;
+  state.mobileControlsVisible = nextValue;
+
+  if (nextValue) {
+    readerScrollInteractionUntil = 0;
+  } else {
+    closeRecentBooks(false);
+    closeSearch(false);
+    closeMobileReadingMenu(false);
+    closeTableOfContents(false);
+    closeSelectionActions(false);
+  }
+
+  syncMobileReadingControls();
+}
+
+function toggleMobileControls() {
+  setMobileControlsVisible(!state.mobileControlsVisible);
+}
+
+function hideMobileControls() {
+  setMobileControlsVisible(false);
 }
 
 function syncAppearanceControls() {
@@ -680,8 +737,6 @@ function updateControlStates() {
   elements.tocToggle.disabled = state.busy || !hasBook || state.tocEntries.length === 0;
   elements.previousPage.disabled = state.busy || !hasBook || state.atStart;
   elements.nextPage.disabled = state.busy || !hasBook || state.atEnd;
-  elements.cornerPrevious.disabled = state.busy || !hasBook || state.atStart;
-  elements.cornerNext.disabled = state.busy || !hasBook || state.atEnd;
   elements.fontDecrease.disabled = state.busy || !hasBook || state.fontSize <= FONT_MIN;
   elements.fontIncrease.disabled = state.busy || !hasBook || state.fontSize >= FONT_MAX;
   elements.widthDecrease.disabled =
@@ -818,7 +873,22 @@ function destroyRendition(rendition) {
   }
 }
 
+const managerInteractionContainers = new WeakSet();
+
+function registerManagerInteractionHandlers(rendition) {
+  const managerContainer = rendition.manager?.container;
+  if (!managerContainer || managerInteractionContainers.has(managerContainer)) return;
+
+  managerInteractionContainers.add(managerContainer);
+  managerContainer.addEventListener("scroll", handleReaderContentScroll, {
+    passive: true,
+  });
+  managerContainer.addEventListener("wheel", handleReaderWheel, { passive: true });
+}
+
 function registerRenditionHandlers(rendition) {
+  registerManagerInteractionHandlers(rendition);
+
   rendition.hooks.content.register((contents) => {
     const contentDocument = contents?.document;
     if (!contentDocument) return;
@@ -830,13 +900,17 @@ function registerRenditionHandlers(rendition) {
     contentDocument.addEventListener("touchmove", handleSwipeMove, { passive: false });
     contentDocument.addEventListener("touchend", handleSwipeEnd, { passive: false });
     contentDocument.addEventListener("touchcancel", cancelSwipeGesture);
+    contentDocument.addEventListener("click", (event) =>
+      handleReaderRegionClick(event, contents),
+    );
     contentDocument.addEventListener("mouseup", () => scheduleSelectionActions(contents, 0));
     contentDocument.addEventListener("touchend", () => scheduleSelectionActions(contents, 120));
     contentDocument.addEventListener("keyup", () => scheduleSelectionActions(contents, 0));
     contentDocument.addEventListener("selectionchange", () =>
       scheduleSelectionActions(contents, 140),
     );
-    contentDocument.addEventListener("scroll", () => closeSelectionActions(false), true);
+    contentDocument.addEventListener("scroll", handleReaderContentScroll, true);
+    contentDocument.addEventListener("wheel", handleReaderWheel, { passive: true });
     contentDocument.addEventListener("dragenter", handleDragEnter);
     contentDocument.addEventListener("dragover", handleDragOver);
     contentDocument.addEventListener("dragleave", handleDragLeave);
@@ -886,6 +960,7 @@ async function openFile(file, fileHandle = null) {
       openAs: "binary",
       replacements: "blobUrl",
     });
+    registerBookSecurityHooks(candidateBook);
 
     await withTimeout(
       candidateBook.opened,
@@ -936,6 +1011,7 @@ async function openFile(file, fileHandle = null) {
     } else {
       await candidateRendition.display();
     }
+    registerManagerInteractionHandlers(candidateRendition);
 
     const hasFileHandle = fileHandle
       ? await storeFileHandle(fingerprint, fileHandle)
@@ -1028,6 +1104,7 @@ function promoteCandidate({
   state.book = book;
   state.rendition = rendition;
   state.renditionMode = renditionMode;
+  state.mobileControlsVisible = true;
   state.fingerprint = fingerprint;
   state.metadata = metadata || {};
   state.fileName = file.name;
@@ -1119,6 +1196,7 @@ async function switchRenditionMode(targetMode) {
       OPEN_TIMEOUT_MS,
       "The reader took too long to change reading modes.",
     );
+    registerManagerInteractionHandlers(candidateRendition);
 
     if (state.book !== book || state.rendition !== previousRendition) {
       throw new ReaderError("The open book changed while its reading mode was being updated.");
@@ -1529,6 +1607,95 @@ function enqueueNavigation(direction) {
     });
 }
 
+function handleReaderRegionClick(
+  event,
+  contents = null,
+  allowSuppressedClick = false,
+) {
+  if (
+    !isMobileLayout() ||
+    !state.rendition ||
+    state.busy ||
+    event.defaultPrevented ||
+    event.button > 0 ||
+    isInteractiveTarget(event.target) ||
+    (!allowSuppressedClick && Date.now() < suppressReaderRegionClickUntil)
+  ) {
+    return;
+  }
+
+  const selection = contents?.document?.getSelection?.();
+  if (selection && !selection.isCollapsed) return;
+
+  let x = Number(event.clientX);
+  let width = 0;
+  const viewerRect = elements.viewerShell.getBoundingClientRect();
+  const contentFrame = contents?.window?.frameElement;
+  if (contentFrame) {
+    const frameRect = contentFrame.getBoundingClientRect();
+    x = frameRect.left + x - viewerRect.left;
+    width = viewerRect.width;
+  } else if (!contents) {
+    x -= viewerRect.left;
+    width = viewerRect.width;
+  } else {
+    width = Number(contents.window?.innerWidth);
+  }
+  if (!Number.isFinite(x) || !Number.isFinite(width) || width <= 0) return;
+
+  const horizontalPosition = clamp(x / width, 0, 1);
+  const isTapPaging =
+    state.mobileReadingMode === "tap" && state.renditionMode === "paginated";
+
+  if (isTapPaging && horizontalPosition <= MOBILE_EDGE_REGION) {
+    event.preventDefault();
+    hideMobileControls();
+    enqueueNavigation("prev");
+    return;
+  }
+
+  if (isTapPaging && horizontalPosition >= 1 - MOBILE_EDGE_REGION) {
+    event.preventDefault();
+    hideMobileControls();
+    enqueueNavigation("next");
+    return;
+  }
+
+  if (
+    horizontalPosition > MOBILE_EDGE_REGION &&
+    horizontalPosition < 1 - MOBILE_EDGE_REGION
+  ) {
+    event.preventDefault();
+    toggleMobileControls();
+  }
+}
+
+let readerScrollInteractionUntil = 0;
+let readerTouchOrigin = null;
+let suppressReaderRegionClickUntil = 0;
+
+function noteReaderScrollInteraction(duration = 850) {
+  readerScrollInteractionUntil = Date.now() + duration;
+}
+
+function handleReaderContentScroll() {
+  closeSelectionActions(false);
+  if (
+    isMobileLayout() &&
+    state.renditionMode === "scroll" &&
+    Date.now() <= readerScrollInteractionUntil
+  ) {
+    hideMobileControls();
+  }
+}
+
+function handleReaderWheel() {
+  noteReaderScrollInteraction();
+  if (isMobileLayout() && state.renditionMode === "scroll") {
+    hideMobileControls();
+  }
+}
+
 function normalizeSelectedText(value) {
   return `${value || ""}`
     .replace(/\u00ad/g, "")
@@ -1711,12 +1878,16 @@ function firstTouch(event, changed = false) {
 let swipeGesture = null;
 
 function handleSwipeStart(event) {
+  const touch = firstTouch(event);
+  if (isMobileLayout() && touch) {
+    readerTouchOrigin = { x: touch.clientX, y: touch.clientY };
+  }
+
   if (!isSwipeReadingMode() || isInteractiveTarget(event.target)) {
     swipeGesture = null;
     return;
   }
 
-  const touch = firstTouch(event);
   if (!touch) {
     swipeGesture = null;
     return;
@@ -1730,13 +1901,38 @@ function handleSwipeStart(event) {
 }
 
 function handleSwipeMove(event) {
-  if (!swipeGesture || !isSwipeReadingMode()) return;
   const touch = firstTouch(event);
+  const horizontalMovement =
+    touch && readerTouchOrigin
+      ? Math.abs(touch.clientX - readerTouchOrigin.x)
+      : 0;
+  const verticalMovement =
+    touch && readerTouchOrigin
+      ? Math.abs(touch.clientY - readerTouchOrigin.y)
+      : 0;
+  const touchMoved = horizontalMovement > 8 || verticalMovement > 8;
+
+  if (touchMoved) {
+    suppressReaderRegionClickUntil = Date.now() + 650;
+  }
+  if (
+    isMobileLayout() &&
+    state.renditionMode === "scroll" &&
+    verticalMovement > 8
+  ) {
+    noteReaderScrollInteraction();
+    hideMobileControls();
+  }
+  if (!swipeGesture || !isSwipeReadingMode()) return;
   if (!touch) return;
 
   const horizontalDistance = Math.abs(touch.clientX - swipeGesture.x);
   const verticalDistance = Math.abs(touch.clientY - swipeGesture.y);
-  if (horizontalDistance > 14 && horizontalDistance > verticalDistance * 1.1) {
+  if (
+    event.cancelable &&
+    horizontalDistance > 14 &&
+    horizontalDistance > verticalDistance * 1.1
+  ) {
     event.preventDefault();
   }
 }
@@ -1744,6 +1940,46 @@ function handleSwipeMove(event) {
 function handleSwipeEnd(event) {
   const gesture = swipeGesture;
   swipeGesture = null;
+  const endingTouch = firstTouch(event, true);
+  const touchMoved = Boolean(
+    endingTouch &&
+      readerTouchOrigin &&
+      (Math.abs(endingTouch.clientX - readerTouchOrigin.x) > 8 ||
+        Math.abs(endingTouch.clientY - readerTouchOrigin.y) > 8)
+  );
+  if (touchMoved) {
+    suppressReaderRegionClickUntil = Date.now() + 650;
+  }
+  readerTouchOrigin = null;
+  if (isMobileLayout() && state.renditionMode === "scroll" && touchMoved) {
+    noteReaderScrollInteraction();
+  }
+
+  if (isMobileLayout() && endingTouch && !touchMoved) {
+    const touchDocument =
+      event.currentTarget?.nodeType === 9 ? event.currentTarget : null;
+    const touchContents = touchDocument
+      ? { document: touchDocument, window: touchDocument.defaultView }
+      : null;
+
+    // Handle taps directly. Some mobile browsers do not reliably dispatch the
+    // later synthetic click after an iframe has paginated.
+    suppressReaderRegionClickUntil = Date.now() + 650;
+    handleReaderRegionClick(
+      {
+        target: event.target,
+        clientX: endingTouch.clientX,
+        button: 0,
+        defaultPrevented: event.defaultPrevented,
+        preventDefault: () => {
+          if (event.cancelable) event.preventDefault();
+        },
+      },
+      touchContents,
+      true,
+    );
+  }
+
   if (!gesture || !isSwipeReadingMode()) return;
 
   const touch = firstTouch(event, true);
@@ -1760,12 +1996,14 @@ function handleSwipeEnd(event) {
     return;
   }
 
-  event.preventDefault();
+  if (event.cancelable) event.preventDefault();
+  hideMobileControls();
   enqueueNavigation(horizontalDistance < 0 ? "next" : "prev");
 }
 
 function cancelSwipeGesture() {
   swipeGesture = null;
+  readerTouchOrigin = null;
 }
 
 function handleReaderKeydown(event) {
@@ -2017,8 +2255,6 @@ function initialize() {
 
   elements.previousPage.addEventListener("click", () => enqueueNavigation("prev"));
   elements.nextPage.addEventListener("click", () => enqueueNavigation("next"));
-  elements.cornerPrevious.addEventListener("click", () => enqueueNavigation("prev"));
-  elements.cornerNext.addEventListener("click", () => enqueueNavigation("next"));
   elements.selectionTranslateDe.addEventListener("click", () =>
     openSelectedTextLookup("translate-de"),
   );
@@ -2077,6 +2313,10 @@ function initialize() {
   elements.viewerShell.addEventListener("touchmove", handleSwipeMove, { passive: false });
   elements.viewerShell.addEventListener("touchend", handleSwipeEnd, { passive: false });
   elements.viewerShell.addEventListener("touchcancel", cancelSwipeGesture);
+  elements.viewerShell.addEventListener("click", (event) =>
+    handleReaderRegionClick(event),
+  );
+  elements.viewerShell.addEventListener("wheel", handleReaderWheel, { passive: true });
 
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !elements.mobileReadingPanel.hidden) {

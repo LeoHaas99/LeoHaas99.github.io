@@ -118,7 +118,7 @@
             >
               <div class="mobile-reading-header">
                 <strong>Mobile reading</strong>
-                <span>Choose how you move through the book</span>
+                <span>Tap the page center to show or hide controls</span>
               </div>
               <fieldset class="mobile-reading-options">
                 <legend class="visually-hidden">Reading mode</legend>
@@ -128,7 +128,7 @@
                 </label>
                 <label>
                   <input type="radio" name="mobile-reading-mode" value="tap" />
-                  <span><strong>Tap corners</strong><small>Tap the invisible bottom corners; no chevrons</small></span>
+                  <span><strong>Tap sides</strong><small>Tap the full left or right edge; no chevrons</small></span>
                 </label>
                 <label>
                   <input type="radio" name="mobile-reading-mode" value="scroll" />
@@ -274,10 +274,6 @@
             </button>
             <div class="viewer-shell">
               <div id="viewer" class="viewer" aria-label="EPUB content"></div>
-              <div id="corner-controls" class="corner-controls" hidden>
-                <button id="corner-previous" type="button" aria-label="Previous page"></button>
-                <button id="corner-next" type="button" aria-label="Next page"></button>
-              </div>
               <div id="loading-overlay" class="loading-overlay" hidden>
                 <span class="spinner" aria-hidden="true"></span>
                 <span id="loading-label">Opening book…</span>

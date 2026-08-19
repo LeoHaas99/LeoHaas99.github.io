@@ -745,45 +745,6 @@ button:disabled {
   border: 0 !important;
 }
 
-.corner-controls {
-  position: absolute;
-  inset: 0;
-  z-index: 6;
-  pointer-events: none;
-}
-
-.corner-controls[hidden] {
-  display: none;
-}
-
-.corner-controls button {
-  position: absolute;
-  bottom: 0;
-  width: 34%;
-  height: 32%;
-  min-height: 88px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  opacity: 0;
-  pointer-events: auto;
-}
-
-.corner-controls button:first-child {
-  left: 0;
-}
-
-.corner-controls button:last-child {
-  right: 0;
-}
-
-.corner-controls button:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: -5px;
-  opacity: 0.16;
-}
-
 .page-button {
   align-self: center;
   width: 48px;
@@ -1037,11 +998,52 @@ button:disabled {
     --toolbar-height: 112px;
   }
 
+  .app-shell,
+  .app-shell[data-mobile-controls="hidden"] {
+    grid-template-rows: 0 auto minmax(0, 1fr) 0;
+  }
+
   .toolbar {
+    position: fixed;
+    inset: 0 0 auto;
     align-items: stretch;
     flex-direction: column;
     gap: 7px;
     padding: 8px;
+  }
+
+  .progress-bar {
+    position: fixed;
+    inset: auto 0 0;
+    width: 100%;
+  }
+
+  .toolbar,
+  .progress-bar {
+    transition:
+      opacity 120ms ease,
+      transform 120ms ease;
+  }
+
+  .app-shell[data-mobile-controls="hidden"] .toolbar,
+  .app-shell[data-mobile-controls="hidden"] .progress-bar {
+    height: 0;
+    min-height: 0;
+    overflow: hidden;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-width: 0;
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  .app-shell[data-mobile-controls="hidden"] .toolbar {
+    transform: translateY(-100%);
+  }
+
+  .app-shell[data-mobile-controls="hidden"] .progress-bar {
+    transform: translateY(100%);
   }
 
   .book-heading {
