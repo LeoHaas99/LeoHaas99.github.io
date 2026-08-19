@@ -95,6 +95,48 @@
               <ol id="search-results" class="search-results"></ol>
             </section>
           </div>
+          <div id="mobile-reading-menu" class="mobile-reading-menu">
+            <button
+              id="mobile-reading-toggle"
+              class="icon-button"
+              type="button"
+              aria-label="Choose mobile reading mode"
+              title="Mobile reading mode"
+              aria-controls="mobile-reading-panel"
+              aria-expanded="false"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="6" y="2.5" width="12" height="19" rx="2" />
+                <path d="M9.5 6.5h5M9.5 17.5h5M9 12h6M9 12l2-2M9 12l2 2M15 12l-2-2M15 12l-2 2" />
+              </svg>
+            </button>
+            <section
+              id="mobile-reading-panel"
+              class="mobile-reading-panel"
+              aria-label="Mobile reading mode"
+              hidden
+            >
+              <div class="mobile-reading-header">
+                <strong>Mobile reading</strong>
+                <span>Choose how you move through the book</span>
+              </div>
+              <fieldset class="mobile-reading-options">
+                <legend class="visually-hidden">Reading mode</legend>
+                <label>
+                  <input type="radio" name="mobile-reading-mode" value="swipe" />
+                  <span><strong>Swipe pages</strong><small>Swipe left or right to turn a page</small></span>
+                </label>
+                <label>
+                  <input type="radio" name="mobile-reading-mode" value="tap" />
+                  <span><strong>Tap corners</strong><small>Tap the invisible bottom corners; no chevrons</small></span>
+                </label>
+                <label>
+                  <input type="radio" name="mobile-reading-mode" value="scroll" />
+                  <span><strong>Infinite scroll</strong><small>Scroll vertically through the whole book</small></span>
+                </label>
+              </fieldset>
+            </section>
+          </div>
           <div class="book-labels">
             <h1 id="book-title">EPUB Reader</h1>
             <p id="chapter-title">Open a book to begin</p>
@@ -190,6 +232,10 @@
             </button>
             <div class="viewer-shell">
               <div id="viewer" class="viewer" aria-label="EPUB content"></div>
+              <div id="corner-controls" class="corner-controls" hidden>
+                <button id="corner-previous" type="button" aria-label="Previous page"></button>
+                <button id="corner-next" type="button" aria-label="Next page"></button>
+              </div>
               <div id="loading-overlay" class="loading-overlay" hidden>
                 <span class="spinner" aria-hidden="true"></span>
                 <span id="loading-label">Opening book…</span>

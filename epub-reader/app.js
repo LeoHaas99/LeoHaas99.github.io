@@ -15,6 +15,10 @@ const READER_WIDTH_STEP = 10;
 const LOCATION_BREAK_SIZE = 1600;
 const OPEN_TIMEOUT_MS = 15000;
 const CONTENT_THEME_STYLE_ID = "epub-reader-content-theme";
+const MOBILE_LAYOUT_QUERY = "(max-width: 760px), (pointer: coarse)";
+const MOBILE_READING_MODES = new Set(["swipe", "tap", "scroll"]);
+const SWIPE_DISTANCE_MIN = 50;
+const SWIPE_DURATION_MAX = 900;
 
 const elements = {
   app: document.querySelector("#app"),
@@ -50,6 +54,12 @@ const elements = {
   searchClose: document.querySelector("#search-close"),
   searchStatus: document.querySelector("#search-status"),
   searchResults: document.querySelector("#search-results"),
+  mobileReadingMenu: document.querySelector("#mobile-reading-menu"),
+  mobileReadingToggle: document.querySelector("#mobile-reading-toggle"),
+  mobileReadingPanel: document.querySelector("#mobile-reading-panel"),
+  mobileReadingModes: Array.from(
+    document.querySelectorAll("input[name='mobile-reading-mode']"),
+  ),
   fontDecrease: document.querySelector("#font-decrease"),
   fontIncrease: document.querySelector("#font-increase"),
   fontSize: document.querySelector("#font-size"),
@@ -64,6 +74,10 @@ const elements = {
   chapterStats: document.querySelector("#chapter-stats"),
   bookStats: document.querySelector("#book-stats"),
   dropOverlay: document.querySelector("#drop-overlay"),
+  viewerShell: document.querySelector(".viewer-shell"),
+  cornerControls: document.querySelector("#corner-controls"),
+  cornerPrevious: document.querySelector("#corner-previous"),
+  cornerNext: document.querySelector("#corner-next"),
 };
 
 const storageAvailableAtStart = detectStorage();
@@ -99,6 +113,8 @@ const state = {
   theme: initialPreferences.theme,
   fontSize: initialPreferences.fontSize,
   readerWidth: initialPreferences.readerWidth,
+  mobileReadingMode: initialPreferences.mobileReadingMode,
+  renditionMode: null,
   navigationQueue: Promise.resolve(),
   noticeVersion: 0,
 };
@@ -119,7 +135,12 @@ function detectStorage() {
 }
 
 function loadPreferences(canUseStorage) {
-  const defaults = { theme: "light", fontSize: 100, readerWidth: 100 };
+  const defaults = {
+    theme: "light",
+    fontSize: 100,
+    readerWidth: 100,
+    mobileReadingMode: "swipe",
+  };
 
   if (!canUseStorage) return defaults;
 
@@ -138,8 +159,11 @@ function loadPreferences(canUseStorage) {
           READER_WIDTH_MAX,
         )
       : defaults.readerWidth;
+    const mobileReadingMode = MOBILE_READING_MODES.has(saved?.mobileReadingMode)
+      ? saved.mobileReadingMode
+      : defaults.mobileReadingMode;
 
-    return { theme, fontSize, readerWidth };
+    return { theme, fontSize, readerWidth, mobileReadingMode };
   } catch {
     return defaults;
   }
@@ -328,6 +352,7 @@ function savePreferences() {
         theme: state.theme,
         fontSize: state.fontSize,
         readerWidth: state.readerWidth,
+        mobileReadingMode: state.mobileReadingMode,
       }),
     );
   } catch {
@@ -543,6 +568,46 @@ function applyRenditionAppearance(rendition = state.rendition) {
   rendition.themes.fontSize(`${state.fontSize}%`);
 }
 
+function isMobileLayout() {
+  return window.matchMedia(MOBILE_LAYOUT_QUERY).matches;
+}
+
+function desiredRenditionMode() {
+  return isMobileLayout() && state.mobileReadingMode === "scroll"
+    ? "scroll"
+    : "paginated";
+}
+
+function renditionOptions(mode) {
+  const isScroll = mode === "scroll";
+  return {
+    width: "100%",
+    height: "100%",
+    flow: isScroll ? "scrolled-continuous" : "paginated",
+    spread: "none",
+    manager: isScroll ? "continuous" : "default",
+    allowScriptedContent: false,
+  };
+}
+
+function syncMobileReadingControls() {
+  const isMobile = isMobileLayout();
+  const showCornerControls =
+    isMobile &&
+    state.mobileReadingMode === "tap" &&
+    state.renditionMode === "paginated" &&
+    Boolean(state.rendition);
+
+  elements.app.dataset.mobileReadingMode = state.mobileReadingMode;
+  elements.app.dataset.renditionMode = state.renditionMode || desiredRenditionMode();
+  elements.cornerControls.hidden = !showCornerControls;
+
+  for (const input of elements.mobileReadingModes) {
+    input.checked = input.value === state.mobileReadingMode;
+    input.disabled = state.busy;
+  }
+}
+
 function syncAppearanceControls() {
   elements.fontSize.value = `${state.fontSize}%`;
   elements.fontSize.textContent = `${state.fontSize}%`;
@@ -550,6 +615,7 @@ function syncAppearanceControls() {
   elements.readerWidth.textContent = `${state.readerWidth}%`;
   elements.app.style.setProperty("--reader-width", `${state.readerWidth}%`);
   applyDocumentTheme();
+  syncMobileReadingControls();
   updateControlStates();
 }
 
@@ -600,9 +666,12 @@ function updateControlStates() {
   elements.recentToggle.disabled = state.busy || state.recentBooks.length === 0;
   elements.searchToggle.disabled = state.busy || !hasBook;
   elements.searchInput.disabled = state.busy || !hasBook;
+  elements.mobileReadingToggle.disabled = state.busy || !isMobileLayout();
   elements.tocToggle.disabled = state.busy || !hasBook || state.tocEntries.length === 0;
   elements.previousPage.disabled = state.busy || !hasBook || state.atStart;
   elements.nextPage.disabled = state.busy || !hasBook || state.atEnd;
+  elements.cornerPrevious.disabled = state.busy || !hasBook || state.atStart;
+  elements.cornerNext.disabled = state.busy || !hasBook || state.atEnd;
   elements.fontDecrease.disabled = state.busy || !hasBook || state.fontSize <= FONT_MIN;
   elements.fontIncrease.disabled = state.busy || !hasBook || state.fontSize >= FONT_MAX;
   elements.widthDecrease.disabled =
@@ -611,6 +680,7 @@ function updateControlStates() {
     state.busy || !hasBook || state.readerWidth >= READER_WIDTH_MAX;
   elements.progress.disabled = state.busy || !hasBook || !state.locationsReady;
   elements.fullscreenToggle.disabled = state.busy || !hasBook || !document.fullscreenEnabled;
+  syncMobileReadingControls();
 }
 
 function setBusy(isBusy, label = "Opening book…") {
@@ -730,6 +800,14 @@ function destroyBook(book, rendition) {
   }
 }
 
+function destroyRendition(rendition) {
+  try {
+    rendition?.destroy();
+  } catch (error) {
+    console.warn("Could not fully destroy the previous rendition.", error);
+  }
+}
+
 function registerRenditionHandlers(rendition) {
   rendition.hooks.content.register((contents) => {
     const contentDocument = contents?.document;
@@ -738,6 +816,10 @@ function registerRenditionHandlers(rendition) {
     applyThemeToContents(contents);
 
     contentDocument.addEventListener("keydown", handleReaderKeydown);
+    contentDocument.addEventListener("touchstart", handleSwipeStart, { passive: true });
+    contentDocument.addEventListener("touchmove", handleSwipeMove, { passive: false });
+    contentDocument.addEventListener("touchend", handleSwipeEnd, { passive: false });
+    contentDocument.addEventListener("touchcancel", cancelSwipeGesture);
     contentDocument.addEventListener("dragenter", handleDragEnter);
     contentDocument.addEventListener("dragover", handleDragOver);
     contentDocument.addEventListener("dragleave", handleDragLeave);
@@ -799,6 +881,7 @@ async function openFile(file, fileHandle = null) {
       candidateBook.loaded.navigation.catch(() => ({ toc: [] })),
     ]);
     const savedPosition = readSavedPosition(fingerprint);
+    const candidateRenditionMode = desiredRenditionMode();
 
     previousViewer = elements.viewer;
     candidateViewer = createCandidateViewer();
@@ -811,14 +894,10 @@ async function openFile(file, fileHandle = null) {
     elements.loadingOverlay.hidden = false;
     await nextFrame();
 
-    candidateRendition = candidateBook.renderTo(candidateViewer, {
-      width: "100%",
-      height: "100%",
-      flow: "paginated",
-      spread: "none",
-      manager: "default",
-      allowScriptedContent: false,
-    });
+    candidateRendition = candidateBook.renderTo(
+      candidateViewer,
+      renditionOptions(candidateRenditionMode),
+    );
     candidateRendition.spread("none");
     registerRenditionHandlers(candidateRendition);
     applyRenditionAppearance(candidateRendition);
@@ -848,6 +927,7 @@ async function openFile(file, fileHandle = null) {
       navigation,
       file,
       hasFileHandle,
+      renditionMode: candidateRenditionMode,
     });
 
     candidateBook = null;
@@ -874,6 +954,7 @@ async function openFile(file, fileHandle = null) {
 
     state.locationsPromise = prepareLocations(state.book, state.rendition);
     void state.locationsPromise;
+    void ensureRenditionMode();
   } catch (error) {
     console.error("Could not open EPUB.", error);
     destroyBook(candidateBook, candidateRendition);
@@ -917,12 +998,14 @@ function promoteCandidate({
   navigation,
   file,
   hasFileHandle,
+  renditionMode,
 }) {
   const previousBook = state.book;
   const previousRendition = state.rendition;
 
   state.book = book;
   state.rendition = rendition;
+  state.renditionMode = renditionMode;
   state.fingerprint = fingerprint;
   state.metadata = metadata || {};
   state.fileName = file.name;
@@ -965,6 +1048,127 @@ function promoteCandidate({
   updateControlStates();
 
   destroyBook(previousBook, previousRendition);
+}
+
+async function switchRenditionMode(targetMode) {
+  const book = state.book;
+  const previousRendition = state.rendition;
+  const previousMode = state.renditionMode;
+  const previousViewer = elements.viewer;
+  const previousLocationsPromise = state.locationsPromise;
+  let candidateRendition = null;
+  let candidateViewer = null;
+
+  if (
+    !book ||
+    !previousRendition ||
+    state.busy ||
+    targetMode === previousMode ||
+    !["paginated", "scroll"].includes(targetMode)
+  ) {
+    syncMobileReadingControls();
+    return;
+  }
+
+  let currentCfi = state.currentLocation?.start?.cfi || "";
+  if (!currentCfi) {
+    try {
+      currentCfi = (await Promise.resolve(previousRendition.currentLocation()))?.start?.cfi || "";
+    } catch (error) {
+      console.warn("Could not read the current position before changing reading mode.", error);
+    }
+  }
+
+  try {
+    setBusy(true, targetMode === "scroll" ? "Starting infinite scroll..." : "Starting page mode...");
+
+    candidateViewer = createCandidateViewer();
+    previousViewer.removeAttribute("id");
+    previousViewer.replaceWith(candidateViewer);
+    elements.viewer = candidateViewer;
+    await nextFrame();
+
+    candidateRendition = book.renderTo(candidateViewer, renditionOptions(targetMode));
+    candidateRendition.spread("none");
+    registerRenditionHandlers(candidateRendition);
+    applyRenditionAppearance(candidateRendition);
+    await withTimeout(
+      candidateRendition.display(currentCfi || undefined),
+      OPEN_TIMEOUT_MS,
+      "The reader took too long to change reading modes.",
+    );
+
+    if (state.book !== book || state.rendition !== previousRendition) {
+      throw new ReaderError("The open book changed while its reading mode was being updated.");
+    }
+
+    state.rendition = candidateRendition;
+    state.renditionMode = targetMode;
+    state.navigationQueue = Promise.resolve();
+    candidateRendition = null;
+    syncMobileReadingControls();
+    destroyRendition(previousRendition);
+
+    await nextFrame();
+    state.rendition.resize();
+    state.rendition.reportLocation();
+    setBusy(false);
+    if (desiredRenditionMode() !== targetMode) {
+      window.setTimeout(() => void ensureRenditionMode(), 0);
+    }
+
+    if (!state.locationsReady) {
+      const activeRendition = state.rendition;
+      state.locationsPromise = (async () => {
+        await previousLocationsPromise?.catch(() => undefined);
+        if (state.book !== book || state.rendition !== activeRendition) return;
+
+        if (Number(book.locations?.length?.()) > 0) {
+          state.locationsReady = true;
+          const location = await Promise.resolve(activeRendition.currentLocation());
+          if (location) handleRelocated(location);
+          updateControlStates();
+        } else {
+          await prepareLocations(book, activeRendition);
+        }
+      })();
+    }
+  } catch (error) {
+    console.error("Could not change the mobile reading mode.", error);
+    destroyRendition(candidateRendition);
+
+    if (candidateViewer && elements.viewer === candidateViewer) {
+      candidateViewer.removeAttribute("id");
+      previousViewer.id = "viewer";
+      candidateViewer.replaceWith(previousViewer);
+      elements.viewer = previousViewer;
+    }
+
+    if (state.book === book) {
+      state.rendition = previousRendition;
+      state.renditionMode = previousMode;
+      try {
+        book.rendition = previousRendition;
+      } catch {
+        // Older epub.js builds may expose this as a read-only reference.
+      }
+    }
+
+    setBusy(false);
+    syncMobileReadingControls();
+    window.setTimeout(() => {
+      previousRendition.resize();
+      previousRendition.reportLocation();
+    }, 0);
+    showNotice("The reader could not change reading modes.", "error");
+  }
+}
+
+async function ensureRenditionMode() {
+  const targetMode = desiredRenditionMode();
+  syncMobileReadingControls();
+  if (!state.rendition || state.busy || state.renditionMode === targetMode) return;
+  await switchRenditionMode(targetMode);
 }
 
 async function prepareLocations(book, rendition) {
@@ -1313,6 +1517,81 @@ function isInteractiveTarget(target) {
   );
 }
 
+function isSwipeReadingMode() {
+  return (
+    isMobileLayout() &&
+    state.mobileReadingMode === "swipe" &&
+    state.renditionMode === "paginated" &&
+    Boolean(state.rendition) &&
+    !state.busy
+  );
+}
+
+function firstTouch(event, changed = false) {
+  const touches = changed ? event.changedTouches : event.touches;
+  return touches?.length === 1 ? touches[0] : null;
+}
+
+let swipeGesture = null;
+
+function handleSwipeStart(event) {
+  if (!isSwipeReadingMode() || isInteractiveTarget(event.target)) {
+    swipeGesture = null;
+    return;
+  }
+
+  const touch = firstTouch(event);
+  if (!touch) {
+    swipeGesture = null;
+    return;
+  }
+
+  swipeGesture = {
+    x: touch.clientX,
+    y: touch.clientY,
+    startedAt: Date.now(),
+  };
+}
+
+function handleSwipeMove(event) {
+  if (!swipeGesture || !isSwipeReadingMode()) return;
+  const touch = firstTouch(event);
+  if (!touch) return;
+
+  const horizontalDistance = Math.abs(touch.clientX - swipeGesture.x);
+  const verticalDistance = Math.abs(touch.clientY - swipeGesture.y);
+  if (horizontalDistance > 14 && horizontalDistance > verticalDistance * 1.1) {
+    event.preventDefault();
+  }
+}
+
+function handleSwipeEnd(event) {
+  const gesture = swipeGesture;
+  swipeGesture = null;
+  if (!gesture || !isSwipeReadingMode()) return;
+
+  const touch = firstTouch(event, true);
+  if (!touch) return;
+
+  const horizontalDistance = touch.clientX - gesture.x;
+  const verticalDistance = touch.clientY - gesture.y;
+  const duration = Date.now() - gesture.startedAt;
+  if (
+    duration > SWIPE_DURATION_MAX ||
+    Math.abs(horizontalDistance) < SWIPE_DISTANCE_MIN ||
+    Math.abs(horizontalDistance) <= Math.abs(verticalDistance) * 1.2
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  enqueueNavigation(horizontalDistance < 0 ? "next" : "prev");
+}
+
+function cancelSwipeGesture() {
+  swipeGesture = null;
+}
+
 function handleReaderKeydown(event) {
   if (!state.rendition || state.busy || event.defaultPrevented) return;
   if (event.ctrlKey || event.altKey || event.metaKey) return;
@@ -1336,10 +1615,41 @@ function handleReaderKeydown(event) {
   }
 }
 
+function toggleMobileReadingMenu() {
+  if (elements.mobileReadingToggle.disabled) return;
+  if (elements.mobileReadingPanel.hidden) {
+    closeRecentBooks(false);
+    closeSearch(false);
+    closeTableOfContents(false);
+    elements.mobileReadingPanel.hidden = false;
+    elements.mobileReadingToggle.setAttribute("aria-expanded", "true");
+  } else {
+    closeMobileReadingMenu();
+  }
+}
+
+function closeMobileReadingMenu(restoreFocus = true) {
+  const wasOpen = !elements.mobileReadingPanel.hidden;
+  elements.mobileReadingPanel.hidden = true;
+  elements.mobileReadingToggle.setAttribute("aria-expanded", "false");
+  if (wasOpen && restoreFocus) elements.mobileReadingToggle.focus();
+}
+
+async function setMobileReadingMode(mode) {
+  if (!MOBILE_READING_MODES.has(mode) || state.busy) return;
+  state.mobileReadingMode = mode;
+  cancelSwipeGesture();
+  savePreferences();
+  syncMobileReadingControls();
+  closeMobileReadingMenu(false);
+  await ensureRenditionMode();
+}
+
 function toggleRecentBooks() {
   if (elements.recentToggle.disabled) return;
   if (elements.recentPanel.hidden) {
     closeSearch(false);
+    closeMobileReadingMenu(false);
     closeTableOfContents(false);
     elements.recentPanel.hidden = false;
     elements.recentToggle.setAttribute("aria-expanded", "true");
@@ -1359,6 +1669,7 @@ function toggleSearch() {
   if (elements.searchToggle.disabled) return;
   if (elements.searchPanel.hidden) {
     closeRecentBooks(false);
+    closeMobileReadingMenu(false);
     closeTableOfContents(false);
     elements.searchPanel.hidden = false;
     elements.searchToggle.setAttribute("aria-expanded", "true");
@@ -1387,6 +1698,7 @@ function openTableOfContents() {
   if (elements.tocToggle.disabled) return;
   closeRecentBooks(false);
   closeSearch(false);
+  closeMobileReadingMenu(false);
   elements.tocPanel.classList.add("is-open");
   elements.tocPanel.setAttribute("aria-hidden", "false");
   elements.tocBackdrop.hidden = false;
@@ -1521,9 +1833,17 @@ function initialize() {
 
   elements.previousPage.addEventListener("click", () => enqueueNavigation("prev"));
   elements.nextPage.addEventListener("click", () => enqueueNavigation("next"));
+  elements.cornerPrevious.addEventListener("click", () => enqueueNavigation("prev"));
+  elements.cornerNext.addEventListener("click", () => enqueueNavigation("next"));
   elements.tocToggle.addEventListener("click", openTableOfContents);
   elements.recentToggle.addEventListener("click", toggleRecentBooks);
   elements.searchToggle.addEventListener("click", toggleSearch);
+  elements.mobileReadingToggle.addEventListener("click", toggleMobileReadingMenu);
+  for (const input of elements.mobileReadingModes) {
+    input.addEventListener("change", () => {
+      if (input.checked) void setMobileReadingMode(input.value);
+    });
+  }
   elements.searchClose.addEventListener("click", () => closeSearch());
   elements.searchForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -1554,8 +1874,18 @@ function initialize() {
   elements.fullscreenToggle.addEventListener("click", () => void toggleFullscreen());
   elements.progress.addEventListener("input", previewProgress);
   elements.progress.addEventListener("change", () => void seekToProgress());
+  elements.viewerShell.addEventListener("touchstart", handleSwipeStart, { passive: true });
+  elements.viewerShell.addEventListener("touchmove", handleSwipeMove, { passive: false });
+  elements.viewerShell.addEventListener("touchend", handleSwipeEnd, { passive: false });
+  elements.viewerShell.addEventListener("touchcancel", cancelSwipeGesture);
 
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !elements.mobileReadingPanel.hidden) {
+      event.preventDefault();
+      closeMobileReadingMenu();
+      return;
+    }
+
     if (event.key === "Escape" && !elements.searchPanel.hidden) {
       event.preventDefault();
       closeSearch();
@@ -1587,6 +1917,12 @@ function initialize() {
     if (!elements.searchPanel.hidden && !elements.searchMenu.contains(event.target)) {
       closeSearch(false);
     }
+    if (
+      !elements.mobileReadingPanel.hidden &&
+      !elements.mobileReadingMenu.contains(event.target)
+    ) {
+      closeMobileReadingMenu(false);
+    }
   });
   document.addEventListener("dragend", () => {
     dragDepth = 0;
@@ -1597,7 +1933,14 @@ function initialize() {
   let resizeTimer = 0;
   window.addEventListener("resize", () => {
     window.clearTimeout(resizeTimer);
-    resizeTimer = window.setTimeout(() => state.rendition?.resize(), 80);
+    resizeTimer = window.setTimeout(() => {
+      updateControlStates();
+      if (state.rendition && state.renditionMode !== desiredRenditionMode()) {
+        void ensureRenditionMode();
+      } else {
+        state.rendition?.resize();
+      }
+    }, 80);
   });
 
   if (typeof window.ePub !== "function" || typeof window.JSZip !== "function") {
