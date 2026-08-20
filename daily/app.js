@@ -12,6 +12,28 @@ const elements = {
 const itemCountLabel = (count, singular, plural) =>
   `${count} ${count === 1 ? singular : plural}`;
 
+const getDayOfYear = (date = new Date()) => {
+  const startOfYear = Date.UTC(date.getFullYear(), 0, 0);
+  const currentDate = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+
+  return Math.floor((currentDate - startOfYear) / 86_400_000);
+};
+
+const ordinal = (number) => {
+  const lastTwoDigits = number % 100;
+
+  if (lastTwoDigits >= 11 && lastTwoDigits <= 13) return `${number}th`;
+
+  const suffixes = ["th", "st", "nd", "rd"];
+  return `${number}${suffixes[number % 10] || suffixes[0]}`;
+};
+
+const readingPaceLabel = (date = new Date()) => {
+  const bookNumber = Math.min(52, Math.ceil((52 / 363) * getDayOfYear(date)));
+
+  return `You should currently be reading your ${ordinal(bookNumber)} book this year.`;
+};
+
 const escapeText = (value) => {
   const div = document.createElement("div");
   div.textContent = value ?? "";
@@ -117,6 +139,7 @@ const renderBooks = (books = []) => {
 
   elements.reading.innerHTML = `
     ${renderHeader("Reading", itemCountLabel(books.length, "book", "books"))}
+    <p class="tag reading-pace">${escapeText(readingPaceLabel())}</p>
     ${books.length ? `<ul class="item-list">${list}</ul>` : renderEmpty("Add books for bored days in data.json.")}
   `;
 };

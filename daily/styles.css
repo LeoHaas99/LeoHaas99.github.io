@@ -186,6 +186,10 @@ h1 {
   font-weight: 700;
 }
 
+.reading-pace {
+  margin: 0 0 16px;
+}
+
 .secondary-grid {
   display: grid;
   gap: 14px;
