@@ -15,18 +15,63 @@
         "title": "The Haunting of Hill House",
         "author": "Shirley Jackson",
         "mood": ""
+      },
+      {
+        "title": "Grapes of Wrath",
+        "author": "John Steinbeck",
+        "mood": ""
+      },
+      {
+        "title": "East of Eden",
+        "author": "John Steinbeck",
+        "mood": ""
+      },
+      {
+        "title": "The Expanse Series",
+        "author": "James S.A. Corey",
+        "mood": ""
+      },
+      {
+        "title": "Siddartha",
+        "author": "Hermann Hesse",
+        "mood": ""
+      },
+      {
+        "title": "Stoner",
+        "author": "John Williams",
+        "mood": "Now in German"
       }
     ]
   },
   "videoGames": [
     {
+      "title": "The Blood of Dawnwalker",
+      "note": "Actually looks decent",
+      "mood": ""
+    },
+    {
       "title": "The Witcher 3: Wild Hunt",
-      "note": "Replay before new DLC",
+      "note": "Replay Remaster before new DLC",
+      "mood": ""
+    },
+    {
+      "title": "Assassin's Creed Black Flag Resynced",
+      "note": "Finally finish a playthrough of this game",
       "mood": ""
     },
     {
       "title": "Disco Elysium",
       "note": "Replay just because",
+      "mood": ""
+    },
+    {
+      "title": "Red Dead Redemption 2",
+      "note": "Finally finish the game",
+      "mood": ""
+    },
+    {
+      "title": "Kingdom Come: Deliverance",
+      "note": "Finish the first one and then maybe play the second one",
       "mood": ""
     }
   ],
@@ -35,7 +80,7 @@
       "title": "Ted Lasso",
       "platform": "TV-Show",
       "director": "",
-      "mood": "rewatching"
+      "mood": "S4"
     },
     {
       "title": "Disclosure Day",
@@ -44,7 +89,5 @@
       "mood": ""
     }
   ],
-  "archive": [
-    
-  ]
+  "archive": []
 }
