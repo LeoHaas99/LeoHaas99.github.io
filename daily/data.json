@@ -2,6 +2,16 @@
   "reading": {
     "books": [
       {
+        "title": "Agrippa",
+        "author": "Robert Harris",
+        "mood": ""
+      },
+      {
+        "title": "Do Androids Dream of Electric Sheep?",
+        "author": "Philip K. Dick",
+        "mood": "reread"
+      },
+      {
         "title": "Schweizerspiegel",
         "author": "Meinrad Inglin",
         "mood": ""
