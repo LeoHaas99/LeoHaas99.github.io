@@ -10,6 +10,4 @@ Used to display possible solutions for my apprentices’ tasks (and other stuff)
 
 [Nonogramm](https://leohaas99.github.io/nonogram/) büll
 
-[Something to do](https://leohaas99.github.io/daily/) things to do when bored
-
 [EPUB Reader](https://leohaas99.github.io/epub-reader/) read local EPUB and KEPUB files, remember your position, use immersive mobile reading modes, and open selected-text web lookups
