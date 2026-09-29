@@ -2,11 +2,6 @@
   "reading": {
     "books": [
       {
-        "title": "Agrippa",
-        "author": "Robert Harris",
-        "mood": ""
-      },
-      {
         "title": "Do Androids Dream of Electric Sheep?",
         "author": "Philip K. Dick",
         "mood": "reread"
@@ -54,11 +49,6 @@
     ]
   },
   "videoGames": [
-    {
-      "title": "The Blood of Dawnwalker",
-      "note": "Actually looks decent",
-      "mood": ""
-    },
     {
       "title": "The Witcher 3: Wild Hunt",
       "note": "Replay Remaster before new DLC",
