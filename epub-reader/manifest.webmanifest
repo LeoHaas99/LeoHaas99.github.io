@@ -11,19 +11,19 @@
   "theme_color": "#f8f7f3",
   "icons": [
     {
-      "src": "icons/reader-192.png",
+      "src": "icons/logo-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icons/reader-512.png",
+      "src": "icons/logo-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icons/reader-maskable-512.png",
+      "src": "icons/logo-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
