@@ -19,3 +19,11 @@ The EPUB file is never uploaded or copied into browser storage. Display preferen
 The reader has no build step or server component. Its pinned copies of epub.js and JSZip live in `vendor/`, so the entire folder can be served directly by GitHub Pages.
 
 DRM-protected EPUBs are not supported. Bookmarks, annotations, text search, and permanent storage of the EPUB itself are outside the first version.
+
+## Install and use offline
+
+Use **Install Reader** on the start screen when offered, or expand the installation instructions for your browser. On iPhone/iPad, use Safari → Share → Add to Home Screen; on supported desktop browsers, use the browser's install command (Safari: File → Add to Dock).
+
+After the first successful online visit and offline setup, the reader can open without a connection. Book files must still be available locally and may need to be selected again. Installation does not sync positions or store the books themselves; web lookups require a connection.
+
+The manifest and service worker are scoped to `/epub-reader/`. When changing a reader asset, bump `CACHE_VERSION` in `sw.js` so the next visit downloads the new release. Updates activate after all reader tabs/windows are closed. For local testing, serve over `http://localhost` rather than opening `index.html` directly.

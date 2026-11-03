@@ -713,6 +713,43 @@ button:disabled {
   font-size: 0.78rem;
 }
 
+.install-card {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+
+.install-card[hidden],
+.install-card [hidden] {
+  display: none;
+}
+
+.install-card summary {
+  padding: 6px 0;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.install-card summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.install-card p {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.install-card details p {
+  margin-top: 8px;
+}
+
 .reader {
   position: relative;
   width: 100%;
@@ -1089,6 +1126,11 @@ button:disabled {
 
   .toolbar-actions {
     justify-content: space-between;
+  }
+
+  .landing {
+    padding-top: calc(var(--toolbar-height) + 24px);
+    align-items: safe center;
   }
 
   .text-button {

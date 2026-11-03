@@ -8,8 +8,14 @@
       content="A private, browser-based EPUB reader with saved reading positions."
     />
     <title>Reader</title>
-    <link rel="icon" href="../logo.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#f8f7f3" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Reader" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/reader.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="styles.css" />
+    <script src="pwa.js" defer></script>
   </head>
   <body>
     <div id="app" class="app-shell" aria-busy="false">
@@ -251,6 +257,14 @@
             <p id="landing-status" class="landing-status" aria-live="polite">
               Your position will return when you select the same file again.
             </p>
+            <section id="install-card" class="install-card" aria-label="Install Reader" hidden>
+              <button id="install-app" class="text-button" type="button" hidden>Install Reader</button>
+              <details id="install-help">
+                <summary>Install Reader on your device</summary>
+                <p id="install-instructions"></p>
+              </details>
+              <p class="install-description">Open from your home screen or desktop. Keep your book files on this device to read offline.</p>
+            </section>
           </div>
         </section>
 

@@ -1,0 +1,32 @@
+{
+  "id": "./",
+  "name": "EPUB Reader",
+  "short_name": "Reader",
+  "description": "Read local EPUB and KEPUB books with saved reading positions.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#e9e8e4",
+  "theme_color": "#f8f7f3",
+  "icons": [
+    {
+      "src": "icons/reader-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/reader-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/reader-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
