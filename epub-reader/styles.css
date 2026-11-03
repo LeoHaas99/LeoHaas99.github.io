@@ -504,14 +504,22 @@ button:disabled {
 }
 
 .notice {
-  z-index: 15;
-  grid-row: 2;
+  position: fixed;
+  z-index: 9;
+  top: calc(var(--toolbar-height) + 8px);
+  left: 50%;
+  width: max-content;
+  max-width: min(42rem, calc(100% - 24px));
   padding: 8px 16px;
-  border-bottom: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 6px;
   background: var(--accent-soft);
+  box-shadow: var(--shadow);
   color: var(--ink);
   font-size: 0.82rem;
   text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .notice[data-kind="warning"] {
@@ -1018,6 +1026,16 @@ button:disabled {
     width: 100%;
   }
 
+  .toc-panel {
+    position: fixed;
+    z-index: 40;
+  }
+
+  .toc-backdrop {
+    position: fixed;
+    z-index: 39;
+  }
+
   .toolbar,
   .progress-bar {
     transition:
@@ -1044,6 +1062,10 @@ button:disabled {
 
   .app-shell[data-mobile-controls="hidden"] .progress-bar {
     transform: translateY(100%);
+  }
+
+  .app-shell[data-mobile-controls="hidden"] .notice {
+    top: 8px;
   }
 
   .book-heading {

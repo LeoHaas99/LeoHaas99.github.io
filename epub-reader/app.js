@@ -1002,14 +1002,26 @@ async function openFile(file, fileHandle = null) {
     let restoredPosition = false;
     if (savedPosition?.cfi) {
       try {
-        await candidateRendition.display(savedPosition.cfi);
+        await withTimeout(
+          candidateRendition.display(savedPosition.cfi),
+          OPEN_TIMEOUT_MS,
+          "This EPUB took too long to restore its saved position.",
+        );
         restoredPosition = true;
       } catch (error) {
         console.warn("The saved EPUB position was invalid; opening at the beginning.", error);
-        await candidateRendition.display();
+        await withTimeout(
+          candidateRendition.display(),
+          OPEN_TIMEOUT_MS,
+          "This EPUB took too long to display and may be damaged or unsupported.",
+        );
       }
     } else {
-      await candidateRendition.display();
+      await withTimeout(
+        candidateRendition.display(),
+        OPEN_TIMEOUT_MS,
+        "This EPUB took too long to display and may be damaged or unsupported.",
+      );
     }
     registerManagerInteractionHandlers(candidateRendition);
 
@@ -1326,7 +1338,13 @@ function renderTableOfContents(items) {
           });
         });
         listItem.append(button);
-        state.tocEntries.push({ href: item.href, label, button });
+        state.tocEntries.push({
+          href: item.href,
+          ...parseChapterHref(item.href),
+          label,
+          button,
+          cfi: null,
+        });
       } else {
         const text = document.createElement("span");
         text.className = "toc-link";
@@ -1348,18 +1366,41 @@ function renderTableOfContents(items) {
   updateControlStates();
 }
 
-function chapterLabelForHref(href, sectionIndex) {
-  const sectionHref = normalizeHref(href);
-  const entry = state.tocEntries.find((candidate) => {
-    const candidateHref = normalizeHref(candidate.href);
-    return (
-      candidateHref === sectionHref ||
-      (candidateHref && sectionHref && sectionHref.endsWith(`/${candidateHref}`)) ||
-      (candidateHref && sectionHref && candidateHref.endsWith(`/${sectionHref}`))
-    );
-  });
+function chapterEntryForPosition(href, cfi, section = state.book?.spine.get(href)) {
+  const { path } = parseChapterHref(href);
+  const entries = state.tocEntries.filter((entry) => chapterPathsMatch(entry.path, path));
+  if (!entries.length) return null;
 
-  return entry?.label || `Section ${sectionIndex + 1}`;
+  const contentDocument =
+    section?.document ||
+    state.rendition?.getContents().find((contents) => contents.sectionIndex === section?.index)
+      ?.document;
+
+  if (section && contentDocument) {
+    for (const entry of entries) {
+      if (entry.cfi) continue;
+      const target = entry.fragment
+        ? contentDocument.getElementById(entry.fragment)
+        : contentDocument.querySelector("body");
+      if (target) entry.cfi = section.cfiFromElement(target);
+    }
+  }
+
+  let activeEntry = null;
+  if (cfi) {
+    const comparator = new window.ePub.CFI();
+    for (const entry of entries) {
+      if (
+        entry.cfi &&
+        comparator.compare(entry.cfi, cfi) <= 0 &&
+        (!activeEntry || comparator.compare(entry.cfi, activeEntry.cfi) >= 0)
+      ) {
+        activeEntry = entry;
+      }
+    }
+  }
+
+  return activeEntry || entries.find((entry) => !entry.fragment) || entries[0];
 }
 
 function renderSearchResults() {
@@ -1437,14 +1478,15 @@ async function performSearch(rawQuery) {
         if (version !== state.searchVersion || state.book !== book) return;
 
         const matches = [...section.find(query), ...section.search(query)];
-        const chapter = chapterLabelForHref(section.href, sectionIndex);
 
         for (const match of matches) {
           if (!match?.cfi || seenCfis.has(match.cfi)) continue;
           seenCfis.add(match.cfi);
           state.searchResults.push({
             cfi: match.cfi,
-            chapter,
+            chapter:
+              chapterEntryForPosition(section.href, match.cfi, section)?.label ||
+              `Section ${sectionIndex + 1}`,
             excerpt: `${match.excerpt || query}`.replace(/\s+/g, " ").trim(),
           });
           if (state.searchResults.length >= SEARCH_RESULT_LIMIT) {
@@ -1480,29 +1522,39 @@ async function performSearch(rawQuery) {
   }
 }
 
-function normalizeHref(href) {
-  const withoutFragment = `${href || ""}`.split("#")[0].replace(/^\.\//, "");
-
-  try {
-    return decodeURIComponent(withoutFragment);
-  } catch {
-    return withoutFragment;
-  }
+function parseChapterHref(href) {
+  const [path, ...fragment] = `${href || ""}`.replace(/^\.\//, "").split("#");
+  const decode = (value) => {
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  };
+  return { path: decode(path), fragment: decode(fragment.join("#")) };
 }
 
-function updateActiveChapter(href) {
-  const currentHref = normalizeHref(href);
-  let activeEntry = null;
+function chapterPathsMatch(left, right) {
+  return Boolean(
+    left && right &&
+      (left === right || left.endsWith(`/${right}`) || right.endsWith(`/${left}`)),
+  );
+}
+
+function updateActiveChapter(location) {
+  const { start, end } = location;
+  // Include headings visible on a paginated page, even when the previous chapter
+  // occupies its first lines. Scrolling follows the top of the viewport instead.
+  const position =
+    state.renditionMode === "paginated" &&
+    end?.cfi &&
+    chapterPathsMatch(parseChapterHref(start.href).path, parseChapterHref(end.href).path)
+      ? end.cfi
+      : start.cfi;
+  const activeEntry = chapterEntryForPosition(start.href, position);
 
   for (const entry of state.tocEntries) {
-    const entryHref = normalizeHref(entry.href);
-    const isMatch =
-      entryHref === currentHref ||
-      (entryHref && currentHref && currentHref.endsWith(`/${entryHref}`)) ||
-      (entryHref && currentHref && entryHref.endsWith(`/${currentHref}`));
-
     entry.button.removeAttribute("aria-current");
-    if (!activeEntry && isMatch) activeEntry = entry;
   }
 
   if (activeEntry) {
@@ -1521,7 +1573,7 @@ function handleRelocated(location) {
   state.currentLocation = location;
   state.atStart = Boolean(location.atStart);
   state.atEnd = Boolean(location.atEnd);
-  updateActiveChapter(location.start.href);
+  updateActiveChapter(location);
 
   let percentage = null;
   if (state.locationsReady && state.book?.locations && location.start.cfi) {
@@ -2120,6 +2172,7 @@ function openTableOfContents() {
   closeRecentBooks(false);
   closeSearch(false);
   closeMobileReadingMenu(false);
+  elements.tocPanel.inert = false;
   elements.tocPanel.classList.add("is-open");
   elements.tocPanel.setAttribute("aria-hidden", "false");
   elements.tocBackdrop.hidden = false;
@@ -2129,12 +2182,14 @@ function openTableOfContents() {
 
 function closeTableOfContents(restoreFocus = true) {
   const wasOpen = elements.tocPanel.classList.contains("is-open");
+  if (wasOpen && (restoreFocus || elements.tocPanel.contains(document.activeElement))) {
+    elements.tocToggle.focus();
+  }
+  elements.tocPanel.inert = true;
   elements.tocPanel.classList.remove("is-open");
   elements.tocPanel.setAttribute("aria-hidden", "true");
   elements.tocBackdrop.hidden = true;
   elements.tocToggle.setAttribute("aria-expanded", "false");
-
-  if (wasOpen && restoreFocus) elements.tocToggle.focus();
 }
 
 async function seekToProgress() {
