@@ -31,6 +31,7 @@ const elements = {
   fileInput: document.querySelector("#file-input"),
   openBook: document.querySelector("#open-book"),
   landingOpenBook: document.querySelector("#landing-open-book"),
+  continueReading: document.querySelector("#continue-reading"),
   landingStatus: document.querySelector("#landing-status"),
   loadingOverlay: document.querySelector("#loading-overlay"),
   loadingLabel: document.querySelector("#loading-label"),
@@ -112,6 +113,7 @@ const state = {
   atStart: true,
   atEnd: false,
   busy: false,
+  openVersion: 0,
   storageAvailable: storageAvailableAtStart,
   fingerprintAvailable: true,
   persistenceWarning: storageAvailableAtStart
@@ -393,7 +395,9 @@ function renderRecentBooks() {
     const percentage = Number.isFinite(record.percentage)
       ? `${Math.round(record.percentage * 100)}% read`
       : "Position saved";
-    const canReopen = Boolean(record.driveId) || record.hasHandle && state.recentHandles.has(record.fingerprint);
+    const cached = window.readerBookCache?.lastInfo;
+    const availableOffline = cached?.fingerprint === record.fingerprint && canOpenCachedBook(cached);
+    const canReopen = availableOffline || Boolean(record.driveId) || record.hasHandle && state.recentHandles.has(record.fingerprint);
 
     button.type = "button";
     button.className = "recent-book-button";
@@ -405,7 +409,7 @@ function renderRecentBooks() {
     title.className = "recent-book-title";
     title.textContent = record.title;
     detail.className = "recent-book-detail";
-    detail.textContent = `${percentage} · ${record.driveId ? "Google Drive" : canReopen ? "Ready to open" : record.fileName || "Reselect file"}`;
+    detail.textContent = `${percentage} · ${availableOffline ? "Available offline" : record.driveId ? "Google Drive" : canReopen ? "Ready to open" : record.fileName || "Reselect file"}`;
 
     button.append(title, detail);
     button.addEventListener("click", () => void openRecentBook(record));
@@ -804,6 +808,12 @@ async function openRecentBook(record) {
   if (state.busy) return;
   closeRecentBooks(false);
 
+  const cached = await window.readerBookCache?.getLast().catch(() => null);
+  if (cached?.fingerprint === record.fingerprint && canOpenCachedBook(cached)) {
+    await openCachedBook(cached);
+    return;
+  }
+
   if (record.driveId && window.readerDrive) {
     await window.readerDrive.openRecent(record);
     return;
@@ -947,12 +957,13 @@ function registerRenditionHandlers(rendition) {
   });
 }
 
-async function openFile(file, fileHandle = null, driveSource = null) {
+async function openFile(file, fileHandle = null, driveSource = null, options = {}) {
   if (state.busy) {
     showNotice("Please wait for the current book to finish opening.", "warning", 3000);
     return;
   }
 
+  state.openVersion += 1;
   closeSelectionActions(true);
 
   let candidateBook = null;
@@ -1094,7 +1105,14 @@ async function openFile(file, fileHandle = null, driveSource = null) {
       restoreBaselineNotice();
     }
 
-    state.locationsPromise = prepareLocations(state.book, state.rendition);
+    const openedBook = state.book;
+    const cached = options.cachedBook?.fingerprint === fingerprint ? options.cachedBook : null;
+    const cacheWrite = window.readerBookCache?.remember(file, openedBook, fingerprint, driveSource, cached)
+      .catch((error) => {
+        console.warn("Could not save an offline copy of this book.", error);
+        if (state.book === openedBook) showNotice("This book could not be kept offline. You can still read it and save your position.", "warning", 6000);
+      });
+    state.locationsPromise = prepareLocations(openedBook, state.rendition, cached?.locations, cacheWrite);
     void state.locationsPromise;
     void ensureRenditionMode();
     return true;
@@ -1319,15 +1337,30 @@ async function ensureRenditionMode() {
   await switchRenditionMode(targetMode);
 }
 
-async function prepareLocations(book, rendition) {
+async function prepareLocations(book, rendition, cachedLocations = null, cacheWrite = null) {
   try {
-    await book.locations.generate(LOCATION_BREAK_SIZE);
+    let restored = false;
+    if (cachedLocations?.version === 1 && cachedLocations.breakSize === LOCATION_BREAK_SIZE) {
+      try {
+        const locations = JSON.parse(cachedLocations.value);
+        if (Array.isArray(locations) && locations.length && locations.every((cfi) => typeof cfi === "string" && cfi.startsWith("epubcfi("))) {
+          book.locations.load(locations);
+          restored = true;
+        }
+      } catch { /* Recalculate an outdated or incomplete page index. */ }
+    }
+    if (!restored) await book.locations.generate(LOCATION_BREAK_SIZE);
     if (state.book !== book || state.rendition !== rendition) return;
 
     state.locationsReady = true;
     const location = await Promise.resolve(rendition.currentLocation());
     if (location) handleRelocated(location);
     updateControlStates();
+    if (!restored && state.fingerprint) {
+      const fingerprint = state.fingerprint;
+      const locations = book.locations.save();
+      void Promise.resolve(cacheWrite).then(() => window.readerBookCache?.saveLocations(fingerprint, locations, LOCATION_BREAK_SIZE)).catch(() => {});
+    }
   } catch (error) {
     if (state.book !== book) return;
     console.warn("Could not calculate EPUB locations.", error);
@@ -2539,4 +2572,39 @@ function initialize() {
   updateControlStates();
 }
 
+function canOpenCachedBook(record) {
+  return Boolean(record && (!record.driveSource || window.readerDrive?.isAccountActive(record.driveSource.accountId)));
+}
+
+async function openCachedBook(record) {
+  if (!canOpenCachedBook(record) || state.busy) return false;
+  return openFile(window.readerBookCache.asFile(record), null, record.driveSource, { cachedBook: record });
+}
+
+function updateCachedBookControl() {
+  const record = window.readerBookCache?.lastInfo;
+  elements.continueReading.hidden = !canOpenCachedBook(record);
+  elements.continueReading.textContent = record ? `Continue reading: ${record.title}` : "Continue reading";
+  renderRecentBooks();
+}
+
+async function restoreCachedBook() {
+  try {
+    const record = await window.readerBookCache?.getLast();
+    updateCachedBookControl();
+    const installed = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+    if (installed && !state.openVersion && !state.busy && !document.getElementById("bookshelf").open && canOpenCachedBook(record)) {
+      await openCachedBook(record);
+    }
+  } catch { /* Local reading remains available when device storage is blocked. */ }
+}
+
 initialize();
+elements.continueReading.addEventListener("click", async () => {
+  try {
+    const record = await window.readerBookCache.getLast();
+    if (!await openCachedBook(record)) updateCachedBookControl();
+  } catch { showNotice("The offline copy is unavailable. Open the book again from Drive or your device.", "warning", 5000); }
+});
+window.addEventListener("reader-cache-changed", updateCachedBookControl);
+document.addEventListener("DOMContentLoaded", () => void restoreCachedBook());

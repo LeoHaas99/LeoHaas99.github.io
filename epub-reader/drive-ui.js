@@ -2,7 +2,8 @@
   const ids = ["bookshelf", "bookshelf-toggle", "landing-bookshelf", "bookshelf-close", "drive-account",
     "drive-setup", "drive-connect", "drive-disconnect", "drive-sync", "drive-status", "drive-permissions",
     "drive-browser", "drive-root", "drive-up", "drive-refresh", "drive-use-folder", "drive-folder-name",
-    "drive-filter", "drive-list-status", "drive-files", "sync-prompt", "sync-resume", "sync-keep"];
+    "drive-filter", "drive-list-status", "drive-files", "sync-prompt", "sync-resume", "sync-keep",
+    "offline-book-status", "remove-offline-book"];
   const ui = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
   const clientId = window.READER_CONFIG?.googleClientId?.trim() || "";
   const configured = /^[\w.-]+\.apps\.googleusercontent\.com$/.test(clientId);
@@ -15,6 +16,8 @@
   let offer = null;
   let checking = false;
   let lastCheck = 0;
+  let previews = new Map();
+  let coverUrls = [];
   const client = new EpubDrive.DriveClient(clientId, (message, kind) => {
     ui["drive-status"].textContent = message;
     ui["drive-status"].dataset.kind = kind;
@@ -40,6 +43,13 @@
     ui["drive-use-folder"].disabled = busy || folders.at(-1).id === library?.id;
     ui["drive-use-folder"].textContent = folders.at(-1).id === library?.id ? "Your book folder" : "Use this folder";
     ui.bookshelf.setAttribute("aria-busy", String(busy));
+    const offline = window.readerBookCache?.lastInfo;
+    const available = canOpenCachedBook(offline);
+    ui["offline-book-status"].textContent = available
+      ? `Available offline on this device: ${offline.title}`
+      : "The last book you open is kept on this device for offline reading.";
+    ui["remove-offline-book"].hidden = !available;
+    updateCachedBookControl();
   }
 
   function fail(error) {
@@ -65,31 +75,82 @@
       controls();
     } else if (!files.length) {
       await browse(folders);
+    } else {
+      await loadPreviews();
+      renderFiles();
     }
   }
 
+  async function loadPreviews() {
+    const accountId = client.account?.id;
+    const records = await window.readerBookCache?.previews(accountId).catch(() => []) || [];
+    if (accountId === client.account?.id) previews = new Map(records.map((record) => [record.driveSource.id, record]));
+  }
+
+  function previewFor(file) {
+    const preview = previews.get(file.id);
+    return preview && (!file.modifiedTime || !preview.driveSource.modifiedTime ||
+      preview.driveSource.modifiedTime === file.modifiedTime) ? preview : null;
+  }
+
+  function displayName(file) {
+    return file.name.replace(/(?:\.kepub)?\.epub$|\.kepub$|\.epu$/i, "")
+      .split(/\s+--\s+/)[0].replace(/_converted$/i, "").replace(/_/g, " ")
+      .replace(/\s*\((?:z-lib[^)]*|z-library[^)]*)\)/gi, "")
+      .replace(/\s*[-–]\s*(?:libgen\.\w+|Anna[’']s Archive).*$/i, "")
+      .replace(/\s*\([^)]*$/, "")
+      .replace(/\s+97[89]\d{10}\b/g, "").trim() || file.name;
+  }
+
   function renderFiles() {
+    coverUrls.forEach((url) => URL.revokeObjectURL(url));
+    coverUrls = [];
     const query = ui["drive-filter"].value.trim().toLocaleLowerCase();
-    const matching = files.filter((file) => file.name.toLocaleLowerCase().includes(query));
+    const matching = files.filter((file) => {
+      const preview = previewFor(file);
+      return [file.name, preview?.title, preview?.author].join(" ").toLocaleLowerCase().includes(query);
+    }).sort((a, b) => Number(b.mimeType === EpubDrive.FOLDER_TYPE) - Number(a.mimeType === EpubDrive.FOLDER_TYPE) ||
+      (previewFor(b)?.openedAt || 0) - (previewFor(a)?.openedAt || 0) || displayName(a).localeCompare(displayName(b)));
     ui["drive-files"].replaceChildren();
     for (const file of matching) {
       const folder = file.mimeType === EpubDrive.FOLDER_TYPE;
+      const preview = folder ? null : previewFor(file);
       const item = document.createElement("li");
       const button = document.createElement("button");
       button.type = "button";
       button.className = "drive-file";
+      button.title = file.name;
       button.disabled = busy || file.capabilities?.canDownload === false && !folder;
       const icon = document.createElement("span");
-      icon.className = "drive-file-icon";
+      icon.className = folder ? "drive-file-icon" : "drive-book-cover";
       icon.setAttribute("aria-hidden", "true");
       icon.textContent = folder ? "▱" : "▤";
+      if (preview?.cover instanceof Blob) {
+        const image = document.createElement("img");
+        const url = URL.createObjectURL(preview.cover);
+        coverUrls.push(url);
+        image.src = url;
+        image.alt = "";
+        image.loading = "lazy";
+        icon.replaceChildren(image);
+      }
       const text = document.createElement("span");
       const title = document.createElement("strong");
-      title.textContent = file.name;
+      title.textContent = folder ? file.name : preview?.title || displayName(file);
       const detail = document.createElement("small");
       detail.textContent = folder ? "Folder" : file.capabilities?.canDownload === false ? "Download not permitted"
         : `${/kepub/i.test(file.name) ? "KEPUB" : "EPUB"}${file.size ? ` · ${(Number(file.size) / 1048576).toFixed(1)} MB` : ""}`;
-      text.append(title, detail);
+      text.append(title);
+      if (preview?.author) {
+        const author = document.createElement("span");
+        author.className = "drive-book-author";
+        author.textContent = preview.author;
+        text.append(author);
+      }
+      if (preview) {
+        detail.textContent += window.readerBookCache?.lastInfo?.fingerprint === preview.fingerprint ? " · Available offline" : " · Recently opened";
+      }
+      text.append(detail);
       button.append(icon, text);
       button.addEventListener("click", () => folder
         ? void browse([...folders, { id: file.id, name: file.name }]) : void openDriveFile(file));
@@ -109,6 +170,7 @@
     ui["drive-files"].replaceChildren();
     try {
       const children = await client.children(path.at(-1).id);
+      await loadPreviews();
       if (version !== viewVersion) return;
       files = children;
       folders = path;
@@ -127,7 +189,7 @@
 
   async function openDriveFile(file, accountId = client.account?.id) {
     if (busy || state.busy) return;
-    if (!client.connected || accountId !== client.account?.id) {
+    if (!accountId || accountId !== client.account?.id) {
       await show();
       client.status("Connect the Google account used for this book, then select it again.", "pending");
       return;
@@ -138,12 +200,23 @@
     renderFiles();
     client.status(`Opening ${file.name}…`);
     try {
-      const bookFile = await client.download(file);
+      const cached = await window.readerBookCache?.getLast().catch(() => null);
+      const useCache = cached?.driveSource?.accountId === accountId && cached.driveSource.id === file.id &&
+        (!file.modifiedTime || cached.driveSource.modifiedTime === file.modifiedTime);
+      if (!useCache && !client.connected) {
+        busy = false;
+        await show();
+        client.status("Reconnect to open this book. Your last downloaded book is available offline.", "pending");
+        return;
+      }
+      const bookFile = useCache ? window.readerBookCache.asFile(cached) : await client.download(file);
       if (version !== viewVersion || accountId !== client.account?.id) return;
       await client.flush();
       if (version !== viewVersion || accountId !== client.account?.id) return;
       // Keep the previous book intact if the download or EPUB parsing fails.
-      const opened = await openFile(bookFile, null, { id: file.id, accountId });
+      const opened = await openFile(bookFile, null,
+        { id: file.id, accountId, modifiedTime: file.modifiedTime || (useCache ? cached.driveSource.modifiedTime : null) },
+        { cachedBook: useCache ? cached : null });
       if (opened) ui.bookshelf.close();
       else client.status(elements.notice.textContent || "This book could not be opened.", "error");
     } catch (error) { if (version === viewVersion) fail(error); }
@@ -205,16 +278,21 @@
       .finally(() => { if (generation === client.generation) { busy = false; controls(); } });
   });
   ui["drive-disconnect"].addEventListener("click", () => {
+    const accountId = client.account?.id;
     viewVersion += 1;
     client.disconnect();
     busy = false;
     files = [];
     folders = [root];
     library = null;
+    previews = new Map();
     offer = null;
     ui["sync-prompt"].hidden = true;
     controls();
     renderFiles();
+    if (accountId) void window.readerBookCache?.forgetAccount(accountId).catch(() => {
+      client.status("Disconnected. The offline copy could not be removed; clear this site's storage to remove it.", "error");
+    });
   });
   ui["drive-use-folder"].addEventListener("click", async () => {
     if (busy) return;
@@ -238,6 +316,27 @@
   ui["bookshelf-close"].addEventListener("click", () => ui.bookshelf.close());
   ui.bookshelf.addEventListener("close", () => { viewVersion += 1; busy = false; controls(); renderFiles(); });
   ui.bookshelf.addEventListener("keydown", (event) => event.stopPropagation());
+  let backdropPointer = false;
+  const outside = (event) => {
+    const rect = ui.bookshelf.getBoundingClientRect();
+    return event.target === ui.bookshelf && (event.clientX < rect.left || event.clientX > rect.right ||
+      event.clientY < rect.top || event.clientY > rect.bottom);
+  };
+  ui.bookshelf.addEventListener("pointerdown", (event) => {
+    backdropPointer = event.pointerType === "mouse" && outside(event);
+  });
+  ui.bookshelf.addEventListener("click", (event) => {
+    if (backdropPointer && outside(event)) ui.bookshelf.close();
+    backdropPointer = false;
+  });
+  ui["remove-offline-book"].addEventListener("click", async () => {
+    try { await window.readerBookCache.removeLast(); }
+    catch { client.status("The offline copy could not be removed. Try again.", "error"); }
+  });
+  window.addEventListener("reader-cache-changed", () => {
+    controls();
+    void loadPreviews().then(renderFiles);
+  });
 
   ui["sync-resume"].addEventListener("click", async () => {
     const selected = offer;

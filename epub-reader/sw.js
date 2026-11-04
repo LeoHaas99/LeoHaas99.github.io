@@ -1,6 +1,6 @@
 // Bump this version whenever a cached reader file changes. A release activates
 // after all Reader tabs/windows close, keeping an open book on one asset version.
-const CACHE_VERSION = "v5";
+const CACHE_VERSION = "v6";
 const CACHE_PREFIX = `epub-reader:${self.registration.scope}:`;
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const SHELL_FILES = [
@@ -8,6 +8,7 @@ const SHELL_FILES = [
   "styles.css",
   "app.js",
   "config.js",
+  "book-cache.js",
   "drive.js",
   "drive-ui.js",
   "pwa.js",

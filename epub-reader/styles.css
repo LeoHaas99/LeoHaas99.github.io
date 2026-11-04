@@ -797,6 +797,8 @@ button:disabled {
 }
 
 .landing-bookshelf { display: block; margin: 14px auto 0; }
+.continue-reading:not([hidden]) { display: block; margin: 0 auto 14px; max-width: 100%; }
+.offline-book { margin-top: 18px; padding-top: 10px; border-top: 1px solid var(--border); }
 .bookshelf {
   width: min(720px, calc(100vw - 24px));
   max-height: calc(100dvh - 32px);
@@ -835,6 +837,13 @@ button:disabled {
 .drive-file > span:last-child { min-width: 0; }
 .drive-file strong { display: block; overflow-wrap: anywhere; font-size: .95rem; }
 .drive-file small { display: block; color: var(--muted); margin-top: 4px; }
+.drive-book-author { display: block; color: var(--muted); margin-top: 5px; font-size: .9rem; }
+.drive-book-cover {
+  display: flex; align-items: center; justify-content: center; flex: 0 0 56px;
+  width: 56px; height: 80px; overflow: hidden; border-radius: 3px;
+  color: var(--accent); background: var(--accent-soft); font-size: 1.6rem;
+}
+.drive-book-cover img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .drive-file-icon { font-size: 1.4rem; color: var(--accent); flex: 0 0 26px; }
 #bookshelf-toggle { position: relative; flex-shrink: 0; }
 #bookshelf-toggle[data-sync="pending"]::after,

@@ -2,9 +2,11 @@
 
 A private, static EPUB reader for GitHub Pages. Choose or drag an `.epub`, `.kepub`, or `.kepub.epub` file into the page, or connect the Google Drive bookshelf. Kobo EPUBs use the same ZIP-based book container and do not require conversion.
 
-The EPUB file is never uploaded or copied into browser storage. Display preferences, the five most recent titles, and the last EPUB CFI for each exact file are stored in `localStorage`. Supporting Chromium browsers keep an opaque read-only file handle in IndexedDB so a recent book can be reopened directly; browsers never expose or store its local path. The browser may ask for file permission again after a reload.
+The EPUB file is never uploaded. The last successfully opened book and its page index are kept on this device in IndexedDB for quick offline reopening; opening another book replaces that copy. Display preferences, the five most recent titles, and the last EPUB CFI for each exact file are stored in `localStorage`. Supporting Chromium browsers also keep an opaque read-only file handle in IndexedDB; browsers never expose or store its local path.
 
-When connected to Drive, books download directly from Google into memory. Reading positions are saved in Drive's hidden `appDataFolder`; book files are never modified. Positions match the book's SHA-256 fingerprint, including when the same file is opened locally. Access tokens stay in memory. Pending progress is kept locally per Google account and retried after reconnecting. Opening or resizing a book does not overwrite cloud progress; the latest timestamped reading update wins, including deliberate jumps backwards. Keep device clocks accurate. A newer position found while a book is open is offered with **Resume there** / **Keep reading here**.
+When connected to Drive, books download directly from Google into the reader. Reading positions are saved in Drive's hidden `appDataFolder`; book files are never modified. Positions match the book's SHA-256 fingerprint, including when the same file is opened locally. Access tokens stay in memory. Pending progress is kept locally per Google account and retried after reconnecting. Opening or resizing a book does not overwrite cloud progress; the latest timestamped reading update wins, including deliberate jumps backwards. Keep device clocks accurate. A newer position found while a book is open is offered with **Resume there** / **Keep reading here**.
+
+Opening a Drive book saves its embedded title, author, and a small cover preview on this device. These books appear first in the bookshelf, most recently opened first. Unopened books use shorter filenames; displaying the bookshelf does not download their contents. Previews are separate from the single offline book copy. Clicking the backdrop closes the bookshelf with a mouse.
 
 ## Controls
 
@@ -20,7 +22,7 @@ When connected to Drive, books download directly from Google into memory. Readin
 
 The reader has no build step or server component. Its pinned copies of epub.js and JSZip live in `vendor/`, so the entire folder can be served directly by GitHub Pages.
 
-DRM-protected EPUBs, bookmarks, annotations, and permanent storage of the EPUB itself are not supported.
+DRM-protected EPUBs, bookmarks, and annotations are not supported.
 
 ## Google Cloud setup
 
@@ -43,6 +45,8 @@ References: [OAuth client setup](https://developers.google.com/identity/oauth2/w
 
 Use **Install Reader** on the start screen when offered, or expand the installation instructions for your browser. On iPhone/iPad, use Safari → Share → Add to Home Screen; on supported desktop browsers, use the browser's install command (Safari: File → Add to Dock).
 
-After the first successful online visit and offline setup, the reader can open without a connection. Book files must still be available locally and may need to be selected again; opening a book from Drive requires a connection. Installation itself does not store books or connect Google Drive. Progress waits locally while offline and syncs when Drive is connected again; web lookups require a connection.
+After the first successful online visit and offline setup, the installed app automatically reopens the last downloaded book at its saved position. A normal browser tab offers **Continue reading** instead. Reopening this copy does not need a connection or Google sign-in; downloading another Drive book and syncing progress do. The cached page index also avoids recalculating book progress on every launch.
+
+Use **Remove offline copy** in the bookshelf to remove the downloaded book. **Disconnect** also removes that Google account's offline copy and previews. Browser storage can be cleared or evicted, so keep the original files; this is a convenience cache, not a backup. Progress waits locally while offline and syncs when Drive is connected again; web lookups require a connection.
 
 The manifest and service worker are scoped to `/epub-reader/`. When changing a reader asset, bump `CACHE_VERSION` in `sw.js` so the next visit downloads the new release. Updates activate after all reader tabs/windows are closed. For local testing, serve over `http://localhost` rather than opening `index.html` directly.

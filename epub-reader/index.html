@@ -258,6 +258,7 @@
             <p class="landing-copy">
               Or choose one from your computer. The book is read in this browser and is never uploaded.
             </p>
+            <button id="continue-reading" class="primary-button continue-reading" type="button" hidden>Continue reading</button>
             <button id="landing-open-book" class="primary-button" type="button">Choose EPUB / KEPUB</button>
             <button id="landing-bookshelf" class="text-button landing-bookshelf" type="button">Open Google Drive bookshelf</button>
             <p id="landing-status" class="landing-status" aria-live="polite">
@@ -357,6 +358,10 @@
         <p id="drive-list-status" class="drive-hint" role="status"></p>
         <ul id="drive-files" class="drive-files"></ul>
       </div>
+      <div class="offline-book">
+        <p id="offline-book-status" class="drive-hint">The last book you open is kept on this device for offline reading.</p>
+        <button id="remove-offline-book" class="text-button" type="button" hidden>Remove offline copy</button>
+      </div>
     </dialog>
 
     <div id="sync-prompt" class="sync-prompt" role="status" hidden>
@@ -368,6 +373,7 @@
     <script src="vendor/jszip.min.js"></script>
     <script src="vendor/epub.min.js"></script>
     <script src="config.js"></script>
+    <script src="book-cache.js"></script>
     <script src="drive.js"></script>
     <script src="app.js"></script>
     <script src="drive-ui.js"></script>
