@@ -23,9 +23,6 @@ class Bit {
 
         this.ctx.beginPath();
         if (this.isLink) {
-            this.ctx.fillStyle = "rgba(255, 255, 255, 0.88)";
-            this.ctx.fillRect(this.bounds.x, this.bounds.y, this.bounds.width, this.bounds.height);
-
             this.ctx.fillStyle = "#005fcc";
             this.ctx.fillText(text, this.position.x, this.position.y);
             this.ctx.strokeStyle = "#005fcc";
