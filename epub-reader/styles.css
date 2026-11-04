@@ -48,6 +48,7 @@ html,
 body {
   width: 100%;
   height: 100%;
+  background: var(--background);
 }
 
 body {
@@ -299,11 +300,12 @@ button:disabled {
 
 .mobile-reading-panel {
   position: fixed;
-  top: calc(var(--toolbar-height) + 8px);
-  right: 12px;
-  left: 12px;
+  top: calc(env(safe-area-inset-top, 0px) + var(--toolbar-height) + 8px);
+  right: calc(env(safe-area-inset-right, 0px) + 12px);
+  left: calc(env(safe-area-inset-left, 0px) + 12px);
   z-index: 30;
-  overflow: hidden;
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - var(--toolbar-height) - 20px);
+  overflow: auto;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface-raised);
@@ -372,6 +374,34 @@ button:disabled {
 .mobile-reading-options small {
   color: var(--muted);
   font-size: 0.72rem;
+}
+
+.mobile-top-margin-setting {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.mobile-top-margin-setting label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.mobile-top-margin-setting input {
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.mobile-top-margin-setting p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
 }
 
 .book-labels {
@@ -1120,11 +1150,16 @@ button:disabled {
   .app-shell,
   .app-shell[data-mobile-controls="hidden"] {
     grid-template-rows: 0 auto minmax(0, 1fr) 0;
+    /* Outside the scrolling viewport so text cannot move into the cutout. */
+    padding-top: max(env(safe-area-inset-top, 0px), var(--mobile-top-margin, 0px));
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
   }
 
   .toolbar {
     position: fixed;
-    inset: 0 0 auto;
+    inset: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) auto env(safe-area-inset-left, 0px);
     align-items: stretch;
     flex-direction: column;
     gap: 7px;
@@ -1133,13 +1168,14 @@ button:disabled {
 
   .progress-bar {
     position: fixed;
-    inset: auto 0 0;
-    width: 100%;
+    inset: auto env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+    width: auto;
   }
 
   .toc-panel {
     position: fixed;
     z-index: 40;
+    inset: env(safe-area-inset-top, 0px) auto env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
   }
 
   .toc-backdrop {
@@ -1192,9 +1228,13 @@ button:disabled {
     display: block;
   }
 
+  .reader-width-controls {
+    display: none;
+  }
+
   .search-panel {
-    right: 12px;
-    left: 12px;
+    right: calc(env(safe-area-inset-right, 0px) + 12px);
+    left: calc(env(safe-area-inset-left, 0px) + 12px);
     width: auto;
   }
 

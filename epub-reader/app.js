@@ -17,6 +17,8 @@ const OPEN_TIMEOUT_MS = 15000;
 const CONTENT_THEME_STYLE_ID = "epub-reader-content-theme";
 const MOBILE_LAYOUT_QUERY = "(max-width: 760px), (pointer: coarse)";
 const MOBILE_READING_MODES = new Set(["swipe", "tap", "scroll"]);
+const MOBILE_TOP_MARGIN_MAX = 120;
+const MOBILE_TOP_MARGIN_STEP = 2;
 const SWIPE_DISTANCE_MIN = 50;
 const SWIPE_DURATION_MAX = 900;
 const SELECTED_TEXT_MAX = 160;
@@ -60,6 +62,8 @@ const elements = {
   mobileReadingMenu: document.querySelector("#mobile-reading-menu"),
   mobileReadingToggle: document.querySelector("#mobile-reading-toggle"),
   mobileReadingPanel: document.querySelector("#mobile-reading-panel"),
+  mobileTopMargin: document.querySelector("#mobile-top-margin"),
+  mobileTopMarginValue: document.querySelector("#mobile-top-margin-value"),
   mobileReadingModes: Array.from(
     document.querySelectorAll("input[name='mobile-reading-mode']"),
   ),
@@ -123,6 +127,7 @@ const state = {
   fontSize: initialPreferences.fontSize,
   readerWidth: initialPreferences.readerWidth,
   mobileReadingMode: initialPreferences.mobileReadingMode,
+  mobileTopMargin: initialPreferences.mobileTopMargin,
   renditionMode: null,
   navigationQueue: Promise.resolve(),
   noticeVersion: 0,
@@ -152,6 +157,7 @@ function loadPreferences(canUseStorage) {
     fontSize: 100,
     readerWidth: 100,
     mobileReadingMode: "swipe",
+    mobileTopMargin: 0,
   };
 
   if (!canUseStorage) return defaults;
@@ -174,8 +180,12 @@ function loadPreferences(canUseStorage) {
     const mobileReadingMode = MOBILE_READING_MODES.has(saved?.mobileReadingMode)
       ? saved.mobileReadingMode
       : defaults.mobileReadingMode;
+    const savedTopMargin = Number(saved?.mobileTopMargin);
+    const mobileTopMargin = Number.isFinite(savedTopMargin)
+      ? clamp(Math.round(savedTopMargin / MOBILE_TOP_MARGIN_STEP) * MOBILE_TOP_MARGIN_STEP, 0, MOBILE_TOP_MARGIN_MAX)
+      : defaults.mobileTopMargin;
 
-    return { theme, fontSize, readerWidth, mobileReadingMode };
+    return { theme, fontSize, readerWidth, mobileReadingMode, mobileTopMargin };
   } catch {
     return defaults;
   }
@@ -367,6 +377,7 @@ function savePreferences() {
         fontSize: state.fontSize,
         readerWidth: state.readerWidth,
         mobileReadingMode: state.mobileReadingMode,
+        mobileTopMargin: state.mobileTopMargin,
       }),
     );
   } catch {
@@ -503,6 +514,7 @@ async function fingerprintBuffer(buffer) {
 function applyDocumentTheme() {
   document.documentElement.dataset.theme = state.theme;
   const isDark = state.theme === "dark";
+  document.querySelector('meta[name="theme-color"]').content = isDark ? "#282b2e" : "#f8f7f3";
   elements.themeToggle.setAttribute("aria-pressed", `${isDark}`);
   elements.themeToggle.setAttribute("aria-label", isDark ? "Use light theme" : "Use dark theme");
 }
@@ -650,6 +662,12 @@ function syncMobileReadingControls() {
   elements.app.dataset.renditionMode = state.renditionMode || desiredRenditionMode();
   elements.app.dataset.mobileControls =
     isMobile && !state.mobileControlsVisible ? "hidden" : "visible";
+  elements.app.style.setProperty("--mobile-top-margin", `${state.mobileTopMargin}px`);
+  elements.mobileTopMargin.value = `${state.mobileTopMargin}`;
+  elements.mobileTopMargin.setAttribute("aria-valuetext", `${state.mobileTopMargin} pixels`);
+  elements.mobileTopMargin.disabled = state.busy;
+  elements.mobileTopMarginValue.value = `${state.mobileTopMargin} px`;
+  elements.mobileTopMarginValue.textContent = `${state.mobileTopMargin} px`;
 
   for (const input of elements.mobileReadingModes) {
     input.checked = input.value === state.mobileReadingMode;
@@ -737,6 +755,25 @@ function changeReaderWidth(direction) {
   });
 }
 
+let mobileMarginResizeTimer = 0;
+
+function setMobileTopMargin(value) {
+  if (!isMobileLayout() || state.busy || !Number.isFinite(Number(value))) return;
+  window.readerDrive?.suspend();
+  state.mobileTopMargin = clamp(
+    Math.round(Number(value) / MOBILE_TOP_MARGIN_STEP) * MOBILE_TOP_MARGIN_STEP, 0, MOBILE_TOP_MARGIN_MAX,
+  );
+  syncMobileReadingControls();
+  savePreferences();
+  const rendition = state.rendition;
+  window.clearTimeout(mobileMarginResizeTimer);
+  mobileMarginResizeTimer = window.setTimeout(() => {
+    if (!rendition || state.rendition !== rendition) return;
+    rendition.resize();
+    rendition.reportLocation();
+  }, 80);
+}
+
 function updateControlStates() {
   const hasBook = Boolean(state.rendition);
   elements.openBook.disabled = state.busy;
@@ -757,6 +794,9 @@ function updateControlStates() {
     state.busy || !hasBook || state.readerWidth >= READER_WIDTH_MAX;
   elements.progress.disabled = state.busy || !hasBook || !state.locationsReady;
   elements.fullscreenToggle.disabled = state.busy || !hasBook || !document.fullscreenEnabled;
+  elements.fullscreenToggle.title = isMobileLayout()
+    ? "Fullscreen hides the phone's system bars where supported"
+    : "Toggle fullscreen";
   syncMobileReadingControls();
 }
 
@@ -2447,6 +2487,7 @@ function initialize() {
   elements.recentToggle.addEventListener("click", toggleRecentBooks);
   elements.searchToggle.addEventListener("click", toggleSearch);
   elements.mobileReadingToggle.addEventListener("click", toggleMobileReadingMenu);
+  elements.mobileTopMargin.addEventListener("input", () => setMobileTopMargin(elements.mobileTopMargin.value));
   for (const input of elements.mobileReadingModes) {
     input.addEventListener("change", () => {
       if (input.checked) void setMobileReadingMode(input.value);

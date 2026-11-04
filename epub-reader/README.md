@@ -13,6 +13,7 @@ Opening a Drive book saves its embedded title, author, and a small cover preview
 - Use the on-screen arrows, `ArrowLeft` / `ArrowRight`, or `ArrowUp` / `ArrowDown` to change pages.
 - Press `Space` for the next page and `Shift+Space` for the previous page.
 - Use the contents button to navigate chapters.
+- On mobile, open **Mobile reading settings → Top margin** to leave space below a camera cutout. The margin stays while scrolling and with controls hidden, and is remembered on this device. Width controls are desktop-only.
 - Use the top-bar search button to find matching text throughout the book and jump to any result.
 - The footer shows chapter screen count, full-book percentage, full-book virtual page count, and overall progress. Its slider seeks after locations have been calculated.
 - The recent-books button lists the latest five books. In browsers with persistent file-handle support, selecting one reopens it directly.
