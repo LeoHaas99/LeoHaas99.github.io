@@ -841,7 +841,7 @@ button:disabled {
   overflow: auto;
 }
 .bookshelf::backdrop { background: rgb(0 0 0 / 48%); }
-.bookshelf [hidden], .sync-prompt[hidden] { display: none; }
+.bookshelf [hidden], .sync-prompt[hidden], .update-banner[hidden] { display: none; }
 .bookshelf-header, .drive-actions, .drive-folder-actions {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }
@@ -882,13 +882,22 @@ button:disabled {
   width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
 }
 #bookshelf-toggle[data-sync="pending"]::after { background: #c48c28; }
-.sync-prompt {
-  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
-  z-index: 51; display: flex; align-items: center; justify-content: center;
-  gap: 10px; flex-wrap: wrap; width: min(620px, calc(100vw - 24px));
+.reader-notifications {
+  position: fixed; bottom: calc(env(safe-area-inset-bottom, 0px) + 80px);
+  left: 50%; transform: translateX(-50%); z-index: 51;
+  display: grid; justify-items: center; gap: 10px;
+  width: min(620px, calc(100vw - 24px)); pointer-events: none;
+}
+.sync-prompt, .update-banner {
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px; flex-wrap: wrap; width: 100%; pointer-events: auto;
   padding: 14px; background: var(--surface-raised); border: 1px solid var(--accent);
   border-radius: 8px; box-shadow: var(--shadow); font-size: .9rem;
 }
+.update-banner { width: min(100%, 440px); justify-content: space-between; }
+.update-actions { display: flex; gap: 8px; }
+.update-actions .text-button { flex: 0 0 auto; white-space: nowrap; }
+#update-now { background: var(--accent-soft); }
 @media (max-width: 440px) {
   .bookshelf { padding: 16px; }
   .drive-actions .primary-button { width: 100%; }

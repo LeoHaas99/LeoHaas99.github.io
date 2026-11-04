@@ -3,6 +3,10 @@
   const button = document.querySelector("#install-app");
   const help = document.querySelector("#install-help");
   const instructions = document.querySelector("#install-instructions");
+  const updateBanner = document.querySelector("#update-banner");
+  const updateMessage = document.querySelector("#update-message");
+  const updateButton = document.querySelector("#update-now");
+  const updateLater = document.querySelector("#update-later");
   const standalone = window.matchMedia("(display-mode: standalone)");
   const scriptUrl = document.currentScript.src;
   let installPrompt = null;
@@ -66,12 +70,93 @@
   renderInstall();
 
   if ("serviceWorker" in window.navigator && window.isSecureContext) {
+    const serviceWorker = window.navigator.serviceWorker;
+    let registration = null;
+    let controller = serviceWorker.controller;
+    let updatedController = null;
+    let dismissedUpdate = null;
+    let applying = false;
+    let prepared = false;
+    let reloading = false;
+    let updateTimer = 0;
+
+    function renderUpdate(message = "Update available.") {
+      const update = registration?.waiting || updatedController;
+      updateBanner.hidden = !update || update === dismissedUpdate;
+      updateMessage.textContent = message;
+      updateButton.disabled = applying;
+      updateLater.disabled = applying;
+    }
+
+    function reloadReader() {
+      if (reloading) return;
+      reloading = true;
+      window.clearTimeout(updateTimer);
+      window.location.reload();
+    }
+
+    function updateFailed(message) {
+      window.clearTimeout(updateTimer);
+      applying = false;
+      prepared = false;
+      window.readerUpdates?.cancel();
+      renderUpdate(message);
+    }
+
+    // Another Reader window may activate the update. Offer a restart here too,
+    // but never reload a book in a window that has not chosen Update now.
+    serviceWorker.addEventListener("controllerchange", () => {
+      const previous = controller;
+      controller = serviceWorker.controller;
+      if (!previous || controller === previous) return;
+      updatedController = controller;
+      if (applying && prepared) reloadReader();
+      else if (!applying) renderUpdate();
+    });
+
+    updateLater.addEventListener("click", () => {
+      dismissedUpdate = registration?.waiting || updatedController;
+      renderUpdate();
+    });
+
+    updateButton.addEventListener("click", async () => {
+      if (applying) return;
+      applying = true;
+      renderUpdate("Saving your place…");
+      try {
+        await window.readerUpdates?.prepare();
+        prepared = true;
+        if (updatedController) {
+          reloadReader();
+          return;
+        }
+        const waiting = registration?.waiting;
+        if (!waiting) throw new Error("The update is no longer ready. Please reopen Reader to check again.");
+        renderUpdate("Updating Reader…");
+        updateTimer = window.setTimeout(() => {
+          updateFailed("The update did not finish. Your book is still open; try again.");
+        }, 15000);
+        waiting.postMessage({ type: "READER_ACTIVATE_UPDATE" });
+      } catch (error) {
+        updateFailed(error.message || "Could not update Reader. Please try again.");
+      }
+    });
+
     window.addEventListener("load", async () => {
       try {
-        const registration = await window.navigator.serviceWorker.register(
+        registration = await serviceWorker.register(
           new URL("sw.js", scriptUrl),
           { scope: new URL("./", scriptUrl).href, updateViaCache: "none" },
         );
+        const watchInstalling = () => {
+          const installing = registration.installing;
+          installing?.addEventListener("statechange", () => {
+            if (!applying) renderUpdate();
+          });
+        };
+        registration.addEventListener("updatefound", watchInstalling);
+        watchInstalling();
+        renderUpdate();
         // Check again when returning to a long-lived reader, without reloading a book.
         let lastUpdateCheck = Date.now();
         window.addEventListener("focus", () => {

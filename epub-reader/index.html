@@ -383,10 +383,19 @@
       </div>
     </dialog>
 
-    <div id="sync-prompt" class="sync-prompt" role="status" hidden>
-      <span>A newer reading position is available from another device.</span>
-      <button id="sync-resume" class="text-button" type="button">Resume there</button>
-      <button id="sync-keep" class="text-button" type="button">Keep reading here</button>
+    <div class="reader-notifications">
+      <div id="sync-prompt" class="sync-prompt" role="status" hidden>
+        <span>A newer reading position is available from another device.</span>
+        <button id="sync-resume" class="text-button" type="button">Resume there</button>
+        <button id="sync-keep" class="text-button" type="button">Keep reading here</button>
+      </div>
+      <div id="update-banner" class="update-banner" role="status" hidden>
+        <span id="update-message">Update available.</span>
+        <div class="update-actions">
+          <button id="update-now" class="text-button" type="button">Update now</button>
+          <button id="update-later" class="text-button" type="button">Later</button>
+        </div>
+      </div>
     </div>
 
     <script src="vendor/jszip.min.js"></script>

@@ -1,6 +1,7 @@
 const PREFS_KEY = "epub-reader:prefs:v1";
 const POSITION_PREFIX = "epub-reader:position:";
 const RECENT_BOOKS_KEY = "epub-reader:recent:v1";
+const UPDATE_RESUME_KEY = "epub-reader:resume-after-update";
 const RECENT_BOOKS_LIMIT = 5;
 const SEARCH_RESULT_LIMIT = 250;
 const SEARCH_DEBOUNCE_MS = 350;
@@ -105,6 +106,8 @@ const state = {
   metadata: null,
   displayTitle: "",
   fileName: "",
+  file: null,
+  cacheWritePromise: null,
   hasFileHandle: false,
   driveSource: null,
   tocEntries: [],
@@ -1173,6 +1176,7 @@ async function openFile(file, fileHandle = null, driveSource = null, options = {
         console.warn("Could not save an offline copy of this book.", error);
         if (state.book === openedBook) showNotice("This book could not be kept offline. You can still read it and save your position.", "warning", 6000);
       });
+    state.cacheWritePromise = cacheWrite;
     state.locationsPromise = prepareLocations(openedBook, state.rendition, cached?.locations, cacheWrite);
     void state.locationsPromise;
     void ensureRenditionMode();
@@ -1234,6 +1238,8 @@ function promoteCandidate({
   state.fingerprint = fingerprint;
   state.metadata = metadata || {};
   state.fileName = file.name;
+  state.file = file;
+  state.cacheWritePromise = null;
   state.hasFileHandle = hasFileHandle;
   state.driveSource = driveSource;
   state.locationsReady = false;
@@ -2663,15 +2669,64 @@ function updateCachedBookControl() {
 }
 
 async function restoreCachedBook() {
+  let resumeAfterUpdate = null;
+  try {
+    resumeAfterUpdate = window.sessionStorage.getItem(UPDATE_RESUME_KEY);
+    window.sessionStorage.removeItem(UPDATE_RESUME_KEY);
+  } catch { /* Installed apps can still resume when session storage is blocked. */ }
   try {
     const record = await window.readerBookCache?.getLast();
     updateCachedBookControl();
     const installed = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
-    if (installed && !state.openVersion && !state.busy && !document.getElementById("bookshelf").open && canOpenCachedBook(record)) {
+    const shouldResume = resumeAfterUpdate ? record?.fingerprint === resumeAfterUpdate : installed;
+    if (shouldResume && !state.openVersion && !state.busy && !document.getElementById("bookshelf").open && canOpenCachedBook(record)) {
       await openCachedBook(record);
     }
   } catch { /* Local reading remains available when device storage is blocked. */ }
 }
+
+let preparingUpdate = false;
+
+function cancelReaderUpdate() {
+  if (preparingUpdate) {
+    preparingUpdate = false;
+    setBusy(false);
+  }
+  try { window.sessionStorage.removeItem(UPDATE_RESUME_KEY); } catch { /* Storage may be unavailable. */ }
+}
+
+async function prepareReaderUpdate() {
+  if (state.busy) throw new ReaderError("Please wait for the book to finish opening, then try again.");
+  if (!state.rendition) return;
+  if (!state.fingerprint || !state.storageAvailable) {
+    throw new ReaderError("Your position cannot be saved on this device. Keep the book open and update later.");
+  }
+
+  preparingUpdate = true;
+  setBusy(true, "Preparing update…");
+  try {
+    await withTimeout(state.navigationQueue, OPEN_TIMEOUT_MS, "Please finish navigating before updating.");
+    await withTimeout(Promise.resolve(state.cacheWritePromise), OPEN_TIMEOUT_MS, "The book is still being saved. Try updating again shortly.");
+    const cached = await window.readerBookCache.getLast();
+    if (cached?.fingerprint !== state.fingerprint || cached?.driveSource?.accountId !== state.driveSource?.accountId) {
+      await window.readerBookCache.remember(state.file, state.book, state.fingerprint, state.driveSource);
+    }
+    const location = await Promise.resolve(state.rendition.currentLocation());
+    if (!location?.start?.cfi) throw new Error("Reading position unavailable.");
+    handleRelocated(location);
+    const saved = readSavedPosition(state.fingerprint);
+    if (!state.storageAvailable || saved?.cfi !== location.start.cfi) throw new Error("Reading position was not saved.");
+    window.sessionStorage.setItem(UPDATE_RESUME_KEY, state.fingerprint);
+    // Preserve any final deliberate movement in Drive's durable local queue.
+    window.readerDrive?.observe(state.fingerprint, saved.cfi, saved.percentage);
+    await withTimeout(Promise.resolve(window.readerDrive?.flush()), 1500, "Sync is still pending.").catch(() => {});
+  } catch (error) {
+    cancelReaderUpdate();
+    throw error instanceof ReaderError ? error : new ReaderError("Could not save your book and position. Keep reading and try updating again later.");
+  }
+}
+
+window.readerUpdates = { prepare: prepareReaderUpdate, cancel: cancelReaderUpdate };
 
 initialize();
 elements.continueReading.addEventListener("click", async () => {

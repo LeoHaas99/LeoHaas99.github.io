@@ -1,6 +1,6 @@
-// Bump this version whenever a cached reader file changes. A release activates
-// after all Reader tabs/windows close, keeping an open book on one asset version.
-const CACHE_VERSION = "v10";
+// Bump this version whenever a cached reader file changes. A release waits until
+// all Reader windows close or the user explicitly chooses Update now.
+const CACHE_VERSION = "v11";
 const CACHE_PREFIX = `epub-reader:${self.registration.scope}:`;
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const SHELL_FILES = [
@@ -30,7 +30,13 @@ self.addEventListener("install", (event) => {
     const cache = await caches.open(CACHE_NAME);
     await cache.addAll([...shellUrls].map((url) => new Request(url, { cache: "reload" })));
   })());
-  // No skipWaiting: do not change the reader underneath an open book.
+  // Installing an update alone must not interrupt an open book.
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "READER_ACTIVATE_UPDATE") {
+    event.waitUntil(self.skipWaiting());
+  }
 });
 
 self.addEventListener("activate", (event) => {
