@@ -1271,6 +1271,18 @@ button:disabled {
     padding-inline: var(--mobile-side-padding, 8px);
   }
 
+  .viewer-shell::after {
+    content: "";
+    position: absolute;
+    top: var(--mobile-top-padding, 0px);
+    right: 1px;
+    left: 1px;
+    z-index: 1;
+    height: 1px;
+    background: var(--border);
+    pointer-events: none;
+  }
+
   .selection-label {
     display: none;
   }
