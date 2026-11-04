@@ -376,14 +376,14 @@ button:disabled {
   font-size: 0.72rem;
 }
 
-.mobile-top-margin-setting {
+.mobile-spacing-setting {
   display: grid;
   gap: 8px;
   padding: 14px;
   border-top: 1px solid var(--border);
 }
 
-.mobile-top-margin-setting label {
+.mobile-spacing-setting label {
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -391,14 +391,14 @@ button:disabled {
   font-weight: 650;
 }
 
-.mobile-top-margin-setting input {
+.mobile-spacing-setting input {
   width: 100%;
   min-height: 28px;
   margin: 0;
   accent-color: var(--accent);
 }
 
-.mobile-top-margin-setting p {
+.mobile-spacing-setting p {
   margin: 0;
   color: var(--muted);
   font-size: 0.75rem;
@@ -1150,8 +1150,7 @@ button:disabled {
   .app-shell,
   .app-shell[data-mobile-controls="hidden"] {
     grid-template-rows: 0 auto minmax(0, 1fr) 0;
-    /* Outside the scrolling viewport so text cannot move into the cutout. */
-    padding-top: max(env(safe-area-inset-top, 0px), var(--mobile-top-margin, 0px));
+    padding-top: env(safe-area-inset-top, 0px);
     padding-right: env(safe-area-inset-right, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
     padding-left: env(safe-area-inset-left, 0px);
@@ -1264,6 +1263,12 @@ button:disabled {
   .viewer-shell {
     width: 100%;
     min-width: 0;
+  }
+
+  .viewer {
+    /* Inside the book container, outside the viewport so text stays below the cutout. */
+    padding-top: var(--mobile-top-padding, 0px);
+    padding-inline: var(--mobile-side-padding, 8px);
   }
 
   .selection-label {

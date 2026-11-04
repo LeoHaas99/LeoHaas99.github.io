@@ -150,10 +150,15 @@
                   <span><strong>Infinite scroll</strong><small>Scroll vertically through the whole book</small></span>
                 </label>
               </fieldset>
-              <div class="mobile-top-margin-setting">
-                <label for="mobile-top-margin">Top margin <output id="mobile-top-margin-value" for="mobile-top-margin">0 px</output></label>
-                <input id="mobile-top-margin" type="range" min="0" max="120" step="2" value="0" aria-describedby="mobile-top-margin-help" />
-                <p id="mobile-top-margin-help">Keep text below the camera cutout, even with controls hidden.</p>
+              <div class="mobile-spacing-setting">
+                <label for="mobile-top-padding">Top padding <output id="mobile-top-padding-value" for="mobile-top-padding">0 px</output></label>
+                <input id="mobile-top-padding" type="range" min="0" max="120" step="2" value="0" aria-describedby="mobile-top-padding-help" />
+                <p id="mobile-top-padding-help">Keep text below the camera cutout, inside the book container.</p>
+              </div>
+              <div class="mobile-spacing-setting">
+                <label for="mobile-side-padding">Side padding <output id="mobile-side-padding-value" for="mobile-side-padding">8 px</output></label>
+                <input id="mobile-side-padding" type="range" min="0" max="48" step="2" value="8" aria-describedby="mobile-side-padding-help" />
+                <p id="mobile-side-padding-help">Space on each side of the text, inside the book container.</p>
               </div>
             </section>
           </div>

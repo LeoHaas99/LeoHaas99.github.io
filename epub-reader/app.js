@@ -17,8 +17,9 @@ const OPEN_TIMEOUT_MS = 15000;
 const CONTENT_THEME_STYLE_ID = "epub-reader-content-theme";
 const MOBILE_LAYOUT_QUERY = "(max-width: 760px), (pointer: coarse)";
 const MOBILE_READING_MODES = new Set(["swipe", "tap", "scroll"]);
-const MOBILE_TOP_MARGIN_MAX = 120;
-const MOBILE_TOP_MARGIN_STEP = 2;
+const MOBILE_TOP_PADDING_MAX = 120;
+const MOBILE_SIDE_PADDING_MAX = 48;
+const MOBILE_SPACING_STEP = 2;
 const SWIPE_DISTANCE_MIN = 50;
 const SWIPE_DURATION_MAX = 900;
 const SELECTED_TEXT_MAX = 160;
@@ -62,8 +63,10 @@ const elements = {
   mobileReadingMenu: document.querySelector("#mobile-reading-menu"),
   mobileReadingToggle: document.querySelector("#mobile-reading-toggle"),
   mobileReadingPanel: document.querySelector("#mobile-reading-panel"),
-  mobileTopMargin: document.querySelector("#mobile-top-margin"),
-  mobileTopMarginValue: document.querySelector("#mobile-top-margin-value"),
+  mobileTopPadding: document.querySelector("#mobile-top-padding"),
+  mobileTopPaddingValue: document.querySelector("#mobile-top-padding-value"),
+  mobileSidePadding: document.querySelector("#mobile-side-padding"),
+  mobileSidePaddingValue: document.querySelector("#mobile-side-padding-value"),
   mobileReadingModes: Array.from(
     document.querySelectorAll("input[name='mobile-reading-mode']"),
   ),
@@ -127,7 +130,8 @@ const state = {
   fontSize: initialPreferences.fontSize,
   readerWidth: initialPreferences.readerWidth,
   mobileReadingMode: initialPreferences.mobileReadingMode,
-  mobileTopMargin: initialPreferences.mobileTopMargin,
+  mobileTopPadding: initialPreferences.mobileTopPadding,
+  mobileSidePadding: initialPreferences.mobileSidePadding,
   renditionMode: null,
   navigationQueue: Promise.resolve(),
   noticeVersion: 0,
@@ -157,7 +161,8 @@ function loadPreferences(canUseStorage) {
     fontSize: 100,
     readerWidth: 100,
     mobileReadingMode: "swipe",
-    mobileTopMargin: 0,
+    mobileTopPadding: 0,
+    mobileSidePadding: 8,
   };
 
   if (!canUseStorage) return defaults;
@@ -180,12 +185,16 @@ function loadPreferences(canUseStorage) {
     const mobileReadingMode = MOBILE_READING_MODES.has(saved?.mobileReadingMode)
       ? saved.mobileReadingMode
       : defaults.mobileReadingMode;
-    const savedTopMargin = Number(saved?.mobileTopMargin);
-    const mobileTopMargin = Number.isFinite(savedTopMargin)
-      ? clamp(Math.round(savedTopMargin / MOBILE_TOP_MARGIN_STEP) * MOBILE_TOP_MARGIN_STEP, 0, MOBILE_TOP_MARGIN_MAX)
-      : defaults.mobileTopMargin;
+    const savedTopPadding = Number(saved?.mobileTopPadding ?? saved?.mobileTopMargin);
+    const mobileTopPadding = Number.isFinite(savedTopPadding)
+      ? clamp(Math.round(savedTopPadding / MOBILE_SPACING_STEP) * MOBILE_SPACING_STEP, 0, MOBILE_TOP_PADDING_MAX)
+      : defaults.mobileTopPadding;
+    const savedSidePadding = Number(saved?.mobileSidePadding);
+    const mobileSidePadding = Number.isFinite(savedSidePadding)
+      ? clamp(Math.round(savedSidePadding / MOBILE_SPACING_STEP) * MOBILE_SPACING_STEP, 0, MOBILE_SIDE_PADDING_MAX)
+      : defaults.mobileSidePadding;
 
-    return { theme, fontSize, readerWidth, mobileReadingMode, mobileTopMargin };
+    return { theme, fontSize, readerWidth, mobileReadingMode, mobileTopPadding, mobileSidePadding };
   } catch {
     return defaults;
   }
@@ -377,7 +386,8 @@ function savePreferences() {
         fontSize: state.fontSize,
         readerWidth: state.readerWidth,
         mobileReadingMode: state.mobileReadingMode,
-        mobileTopMargin: state.mobileTopMargin,
+        mobileTopPadding: state.mobileTopPadding,
+        mobileSidePadding: state.mobileSidePadding,
       }),
     );
   } catch {
@@ -519,7 +529,7 @@ function applyDocumentTheme() {
   elements.themeToggle.setAttribute("aria-label", isDark ? "Use light theme" : "Use dark theme");
 }
 
-function contentThemeCss(theme) {
+function contentThemeCss(theme, useMobilePadding = false) {
   const colors =
     theme === "dark"
       ? {
@@ -538,6 +548,8 @@ function contentThemeCss(theme) {
         };
 
   return `
+    ${useMobilePadding ? "body { padding-left: 0 !important; padding-right: 0 !important; }" : ""}
+
     :root,
     body {
       background-color: ${colors.background} !important;
@@ -569,7 +581,7 @@ function contentThemeCss(theme) {
   `;
 }
 
-function applyThemeToContents(contents, theme = state.theme) {
+function applyThemeToContents(contents, theme = state.theme, rendition = state.rendition) {
   const contentDocument = contents?.document;
   if (!contentDocument?.head) return;
 
@@ -580,7 +592,9 @@ function applyThemeToContents(contents, theme = state.theme) {
     contentDocument.head.append(style);
   }
 
-  style.textContent = contentThemeCss(theme);
+  // Mobile padding belongs inside the viewer; remove epub.js's extra text inset.
+  const useMobilePadding = isMobileLayout() && rendition?.manager?.layout?.name !== "pre-paginated";
+  style.textContent = contentThemeCss(theme, useMobilePadding);
   contentDocument.documentElement.style.colorScheme = theme;
 }
 
@@ -588,7 +602,7 @@ function applyRenditionTheme(rendition = state.rendition) {
   if (!rendition) return;
 
   for (const contents of rendition.getContents()) {
-    applyThemeToContents(contents);
+    applyThemeToContents(contents, state.theme, rendition);
   }
 }
 
@@ -616,6 +630,7 @@ function renditionOptions(mode) {
     height: "100%",
     flow: isScroll ? "scrolled-continuous" : "paginated",
     spread: "none",
+    gap: isMobileLayout() ? 0 : undefined,
     manager: isScroll ? "continuous" : "default",
     allowScriptedContent: false,
   };
@@ -662,12 +677,18 @@ function syncMobileReadingControls() {
   elements.app.dataset.renditionMode = state.renditionMode || desiredRenditionMode();
   elements.app.dataset.mobileControls =
     isMobile && !state.mobileControlsVisible ? "hidden" : "visible";
-  elements.app.style.setProperty("--mobile-top-margin", `${state.mobileTopMargin}px`);
-  elements.mobileTopMargin.value = `${state.mobileTopMargin}`;
-  elements.mobileTopMargin.setAttribute("aria-valuetext", `${state.mobileTopMargin} pixels`);
-  elements.mobileTopMargin.disabled = state.busy;
-  elements.mobileTopMarginValue.value = `${state.mobileTopMargin} px`;
-  elements.mobileTopMarginValue.textContent = `${state.mobileTopMargin} px`;
+  elements.app.style.setProperty("--mobile-top-padding", `${state.mobileTopPadding}px`);
+  elements.mobileTopPadding.value = `${state.mobileTopPadding}`;
+  elements.mobileTopPadding.setAttribute("aria-valuetext", `${state.mobileTopPadding} pixels`);
+  elements.mobileTopPadding.disabled = state.busy;
+  elements.mobileTopPaddingValue.value = `${state.mobileTopPadding} px`;
+  elements.mobileTopPaddingValue.textContent = `${state.mobileTopPadding} px`;
+  elements.app.style.setProperty("--mobile-side-padding", `${state.mobileSidePadding}px`);
+  elements.mobileSidePadding.value = `${state.mobileSidePadding}`;
+  elements.mobileSidePadding.setAttribute("aria-valuetext", `${state.mobileSidePadding} pixels on each side`);
+  elements.mobileSidePadding.disabled = state.busy;
+  elements.mobileSidePaddingValue.value = `${state.mobileSidePadding} px`;
+  elements.mobileSidePaddingValue.textContent = `${state.mobileSidePadding} px`;
 
   for (const input of elements.mobileReadingModes) {
     input.checked = input.value === state.mobileReadingMode;
@@ -755,19 +776,19 @@ function changeReaderWidth(direction) {
   });
 }
 
-let mobileMarginResizeTimer = 0;
+let mobileSpacingResizeTimer = 0;
 
-function setMobileTopMargin(value) {
+function setMobileSpacing(preference, value, maximum) {
   if (!isMobileLayout() || state.busy || !Number.isFinite(Number(value))) return;
   window.readerDrive?.suspend();
-  state.mobileTopMargin = clamp(
-    Math.round(Number(value) / MOBILE_TOP_MARGIN_STEP) * MOBILE_TOP_MARGIN_STEP, 0, MOBILE_TOP_MARGIN_MAX,
+  state[preference] = clamp(
+    Math.round(Number(value) / MOBILE_SPACING_STEP) * MOBILE_SPACING_STEP, 0, maximum,
   );
   syncMobileReadingControls();
   savePreferences();
   const rendition = state.rendition;
-  window.clearTimeout(mobileMarginResizeTimer);
-  mobileMarginResizeTimer = window.setTimeout(() => {
+  window.clearTimeout(mobileSpacingResizeTimer);
+  mobileSpacingResizeTimer = window.setTimeout(() => {
     if (!rendition || state.rendition !== rendition) return;
     rendition.resize();
     rendition.reportLocation();
@@ -958,7 +979,7 @@ function registerRenditionHandlers(rendition) {
 
     // The content hooks run after epub.js positions a newly loaded chapter.
     // Apply reader styles and measure it before resolving a text or anchor target.
-    applyThemeToContents(view.contents);
+    applyThemeToContents(view.contents, state.theme, rendition);
     view.contents.css("font-size", `${state.fontSize}%`);
     view.expand();
   });
@@ -2487,7 +2508,12 @@ function initialize() {
   elements.recentToggle.addEventListener("click", toggleRecentBooks);
   elements.searchToggle.addEventListener("click", toggleSearch);
   elements.mobileReadingToggle.addEventListener("click", toggleMobileReadingMenu);
-  elements.mobileTopMargin.addEventListener("input", () => setMobileTopMargin(elements.mobileTopMargin.value));
+  elements.mobileTopPadding.addEventListener("input", () =>
+    setMobileSpacing("mobileTopPadding", elements.mobileTopPadding.value, MOBILE_TOP_PADDING_MAX),
+  );
+  elements.mobileSidePadding.addEventListener("input", () =>
+    setMobileSpacing("mobileSidePadding", elements.mobileSidePadding.value, MOBILE_SIDE_PADDING_MAX),
+  );
   for (const input of elements.mobileReadingModes) {
     input.addEventListener("change", () => {
       if (input.checked) void setMobileReadingMode(input.value);
@@ -2595,8 +2621,15 @@ function initialize() {
       updateControlStates();
       if (state.rendition && state.renditionMode !== desiredRenditionMode()) {
         void ensureRenditionMode();
-      } else {
-        state.rendition?.resize();
+      } else if (state.rendition) {
+        applyRenditionTheme();
+        const manager = state.rendition.manager;
+        const gap = isMobileLayout() ? 0 : undefined;
+        if (manager.settings.gap !== gap) {
+          manager.settings.gap = gap;
+          manager.updateLayout();
+        }
+        state.rendition.resize();
       }
     }, 80);
   });
