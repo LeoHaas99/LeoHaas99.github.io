@@ -889,11 +889,19 @@ function registerManagerInteractionHandlers(rendition) {
 function registerRenditionHandlers(rendition) {
   registerManagerInteractionHandlers(rendition);
 
+  rendition.hooks.render.register((view) => {
+    if (!view.contents) return;
+
+    // The content hooks run after epub.js positions a newly loaded chapter.
+    // Apply reader styles and measure it before resolving a text or anchor target.
+    applyThemeToContents(view.contents);
+    view.contents.css("font-size", `${state.fontSize}%`);
+    view.expand();
+  });
+
   rendition.hooks.content.register((contents) => {
     const contentDocument = contents?.document;
     if (!contentDocument) return;
-
-    applyThemeToContents(contents);
 
     contentDocument.addEventListener("keydown", handleReaderKeydown);
     contentDocument.addEventListener("touchstart", handleSwipeStart, { passive: true });
@@ -1426,6 +1434,24 @@ function chapterEntryForPosition(href, cfi, section = state.book?.spine.get(href
   return activeEntry || entries.find((entry) => !entry.fragment) || entries[0];
 }
 
+function alignSearchResult(rendition, cfi) {
+  if (state.rendition !== rendition || state.renditionMode !== "scroll") return;
+
+  const range = rendition.getRange(cfi);
+  const frame = range?.startContainer.ownerDocument?.defaultView?.frameElement;
+  const rect = range && Array.from(range.getClientRects()).find((rect) => rect.height > 0);
+  if (!frame?.isConnected || !rect) return;
+
+  // Continuous display fills neighboring chapters after its initial scroll.
+  // Re-align the text now that a jump near the chapter's end is no longer clamped.
+  const manager = rendition.manager;
+  const offset =
+    frame.getBoundingClientRect().top + rect.top -
+    manager.container.getBoundingClientRect().top;
+  manager.scrollBy(0, offset, true);
+  rendition.reportLocation();
+}
+
 function renderSearchResults() {
   elements.searchResults.replaceChildren();
 
@@ -1448,8 +1474,10 @@ function renderSearchResults() {
       const rendition = state.rendition;
       if (!rendition || state.busy) return;
       closeSearch(false);
+      hideMobileControls();
       try {
         await rendition.display(result.cfi);
+        alignSearchResult(rendition, result.cfi);
       } catch (error) {
         console.error("Could not open the search result.", error);
         showNotice("That search result could not be opened.", "error");
