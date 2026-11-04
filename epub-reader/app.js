@@ -98,6 +98,7 @@ const state = {
   displayTitle: "",
   fileName: "",
   hasFileHandle: false,
+  driveSource: null,
   tocEntries: [],
   recentBooks: initialRecentBooks,
   recentHandles: new Map(),
@@ -204,6 +205,8 @@ function loadRecentBooks(canUseStorage) {
           : null,
         updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : "",
         hasHandle: Boolean(record.hasHandle),
+        driveId: typeof record.driveId === "string" ? record.driveId : null,
+        driveAccountId: typeof record.driveAccountId === "string" ? record.driveAccountId : null,
       }));
   } catch {
     return [];
@@ -390,7 +393,7 @@ function renderRecentBooks() {
     const percentage = Number.isFinite(record.percentage)
       ? `${Math.round(record.percentage * 100)}% read`
       : "Position saved";
-    const canReopen = record.hasHandle && state.recentHandles.has(record.fingerprint);
+    const canReopen = Boolean(record.driveId) || record.hasHandle && state.recentHandles.has(record.fingerprint);
 
     button.type = "button";
     button.className = "recent-book-button";
@@ -402,7 +405,7 @@ function renderRecentBooks() {
     title.className = "recent-book-title";
     title.textContent = record.title;
     detail.className = "recent-book-detail";
-    detail.textContent = `${percentage} · ${canReopen ? "Ready to open" : record.fileName || "Reselect file"}`;
+    detail.textContent = `${percentage} · ${record.driveId ? "Google Drive" : canReopen ? "Ready to open" : record.fileName || "Reselect file"}`;
 
     button.append(title, detail);
     button.addEventListener("click", () => void openRecentBook(record));
@@ -428,6 +431,8 @@ function rememberCurrentBook(percentage = null, updatedAt = new Date().toISOStri
       : existing?.percentage ?? null,
     updatedAt,
     hasHandle: state.hasFileHandle || existing?.hasHandle || false,
+    driveId: state.driveSource?.id || null,
+    driveAccountId: state.driveSource?.accountId || null,
   };
 
   state.recentBooks = [
@@ -479,6 +484,7 @@ function saveCurrentPosition(cfi, percentage) {
   }
 
   rememberCurrentBook(percentage, updatedAt);
+  if (!state.busy) window.readerDrive?.observe(state.fingerprint, cfi, percentage);
 }
 
 async function fingerprintBuffer(buffer) {
@@ -699,6 +705,7 @@ function setTheme(theme) {
 
 function changeFontSize(direction) {
   if (!state.rendition || state.busy) return;
+  window.readerDrive?.suspend();
 
   state.fontSize = clamp(state.fontSize + direction * FONT_STEP, FONT_MIN, FONT_MAX);
   state.rendition.themes.fontSize(`${state.fontSize}%`);
@@ -708,6 +715,7 @@ function changeFontSize(direction) {
 
 function changeReaderWidth(direction) {
   if (!state.rendition || state.busy) return;
+  window.readerDrive?.suspend();
 
   state.readerWidth = clamp(
     state.readerWidth + direction * READER_WIDTH_STEP,
@@ -795,6 +803,11 @@ async function promptForFile() {
 async function openRecentBook(record) {
   if (state.busy) return;
   closeRecentBooks(false);
+
+  if (record.driveId && window.readerDrive) {
+    await window.readerDrive.openRecent(record);
+    return;
+  }
 
   const handle =
     state.recentHandles.get(record.fingerprint) ||
@@ -884,6 +897,7 @@ function registerManagerInteractionHandlers(rendition) {
     passive: true,
   });
   managerContainer.addEventListener("wheel", handleReaderWheel, { passive: true });
+  managerContainer.addEventListener("pointerdown", () => window.readerDrive?.interact(), { passive: true });
 }
 
 function registerRenditionHandlers(rendition) {
@@ -933,7 +947,7 @@ function registerRenditionHandlers(rendition) {
   });
 }
 
-async function openFile(file, fileHandle = null) {
+async function openFile(file, fileHandle = null, driveSource = null) {
   if (state.busy) {
     showNotice("Please wait for the current book to finish opening.", "warning", 3000);
     return;
@@ -985,7 +999,10 @@ async function openFile(file, fileHandle = null) {
       candidateBook.loaded.metadata.catch(() => ({})),
       candidateBook.loaded.navigation.catch(() => ({ toc: [] })),
     ]);
-    const savedPosition = readSavedPosition(fingerprint);
+    const localPosition = readSavedPosition(fingerprint);
+    const savedPosition = window.readerDrive
+      ? await window.readerDrive.preparePosition(fingerprint, localPosition)
+      : localPosition;
     const candidateRenditionMode = desiredRenditionMode();
 
     previousViewer = elements.viewer;
@@ -1037,6 +1054,10 @@ async function openFile(file, fileHandle = null) {
       ? await storeFileHandle(fingerprint, fileHandle)
       : state.recentHandles.has(fingerprint);
 
+    if (driveSource && !window.readerDrive?.isAccountActive(driveSource.accountId)) {
+      throw new ReaderError("The Google Drive account changed while opening the book. Please select it again.");
+    }
+
     promoteCandidate({
       book: candidateBook,
       rendition: candidateRendition,
@@ -1046,7 +1067,9 @@ async function openFile(file, fileHandle = null) {
       file,
       hasFileHandle,
       renditionMode: candidateRenditionMode,
+      driveSource,
     });
+    window.readerDrive?.activate(fingerprint, savedPosition);
 
     candidateBook = null;
     candidateRendition = null;
@@ -1057,6 +1080,7 @@ async function openFile(file, fileHandle = null) {
     try {
       state.rendition.resize();
       state.rendition.reportLocation();
+      if (restoredPosition) alignSearchResult(state.rendition, savedPosition.cfi);
     } catch (error) {
       console.warn("The reader could not immediately resize the new rendition.", error);
     }
@@ -1073,6 +1097,7 @@ async function openFile(file, fileHandle = null) {
     state.locationsPromise = prepareLocations(state.book, state.rendition);
     void state.locationsPromise;
     void ensureRenditionMode();
+    return true;
   } catch (error) {
     console.error("Could not open EPUB.", error);
     destroyBook(candidateBook, candidateRendition);
@@ -1105,6 +1130,7 @@ async function openFile(file, fileHandle = null) {
         ? error.message
         : "This file could not be opened as an EPUB. It may be damaged, unsupported, or DRM-protected.";
     showNotice(message, "error");
+    return false;
   }
 }
 
@@ -1117,6 +1143,7 @@ function promoteCandidate({
   file,
   hasFileHandle,
   renditionMode,
+  driveSource,
 }) {
   const previousBook = state.book;
   const previousRendition = state.rendition;
@@ -1129,6 +1156,7 @@ function promoteCandidate({
   state.metadata = metadata || {};
   state.fileName = file.name;
   state.hasFileHandle = hasFileHandle;
+  state.driveSource = driveSource;
   state.locationsReady = false;
   state.currentLocation = null;
   state.currentChapter = "";
@@ -1363,6 +1391,7 @@ function renderTableOfContents(items) {
           if (!rendition || state.busy) return;
           closeTableOfContents(false);
           hideMobileControls();
+          window.readerDrive?.interact();
           rendition.display(href).catch((error) => {
             console.error("Could not open this chapter.", error);
             showNotice("That chapter could not be opened.", "error");
@@ -1475,6 +1504,7 @@ function renderSearchResults() {
       if (!rendition || state.busy) return;
       closeSearch(false);
       hideMobileControls();
+      window.readerDrive?.interact();
       try {
         await rendition.display(result.cfi);
         alignSearchResult(rendition, result.cfi);
@@ -1697,6 +1727,7 @@ function enqueueNavigation(direction) {
   if (!rendition || state.busy) return;
   if (direction === "prev" && state.atStart) return;
   if (direction === "next" && state.atEnd) return;
+  window.readerDrive?.interact();
 
   state.navigationQueue = state.navigationQueue
     .catch(() => undefined)
@@ -1778,6 +1809,7 @@ let readerTouchOrigin = null;
 let suppressReaderRegionClickUntil = 0;
 
 function noteReaderScrollInteraction(duration = 850) {
+  window.readerDrive?.interact();
   readerScrollInteractionUntil = Date.now() + duration;
 }
 
@@ -2161,6 +2193,7 @@ function closeMobileReadingMenu(restoreFocus = true) {
 
 async function setMobileReadingMode(mode) {
   if (!MOBILE_READING_MODES.has(mode) || state.busy) return;
+  window.readerDrive?.suspend();
   state.mobileReadingMode = mode;
   cancelSwipeGesture();
   savePreferences();
@@ -2245,6 +2278,7 @@ function closeTableOfContents(restoreFocus = true) {
 
 async function seekToProgress() {
   if (!state.locationsReady || !state.book || !state.rendition || state.busy) return;
+  window.readerDrive?.interact();
 
   try {
     const percentage = clamp(Number(elements.progress.value) / 100, 0, 1);
@@ -2480,6 +2514,7 @@ function initialize() {
 
   let resizeTimer = 0;
   window.addEventListener("resize", () => {
+    window.readerDrive?.suspend();
     closeSelectionActions(false);
     window.clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => {

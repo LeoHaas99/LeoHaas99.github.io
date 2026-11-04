@@ -143,6 +143,11 @@
               </fieldset>
             </section>
           </div>
+          <button id="bookshelf-toggle" class="icon-button" type="button" aria-label="Open Google Drive bookshelf" title="Google Drive bookshelf">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3 4h5v16H3zM9 4h5v16H9zM16 5l4-1 3 15-4 1z" />
+            </svg>
+          </button>
           <div class="book-labels">
             <h1 id="book-title">EPUB Reader</h1>
             <p id="chapter-title">Open a book to begin</p>
@@ -254,6 +259,7 @@
               Or choose one from your computer. The book is read in this browser and is never uploaded.
             </p>
             <button id="landing-open-book" class="primary-button" type="button">Choose EPUB / KEPUB</button>
+            <button id="landing-bookshelf" class="text-button landing-bookshelf" type="button">Open Google Drive bookshelf</button>
             <p id="landing-status" class="landing-status" aria-live="polite">
               Your position will return when you select the same file again.
             </p>
@@ -325,8 +331,45 @@
       </div>
     </div>
 
+    <dialog id="bookshelf" class="bookshelf" aria-labelledby="bookshelf-title">
+      <header class="bookshelf-header">
+        <div><h2 id="bookshelf-title">Your bookshelf</h2><p id="drive-account">Read from Google Drive on any device.</p></div>
+        <button id="bookshelf-close" class="icon-button" type="button" aria-label="Close bookshelf">×</button>
+      </header>
+      <p id="drive-setup" hidden>Google Drive is not configured yet. The site owner needs to add the Google OAuth client ID.</p>
+      <div class="drive-actions">
+        <button id="drive-connect" class="primary-button" type="button">Connect Google Drive</button>
+        <button id="drive-disconnect" class="text-button" type="button" hidden>Disconnect</button>
+        <button id="drive-sync" class="text-button" type="button" hidden>Sync now</button>
+      </div>
+      <p id="drive-permissions" class="drive-hint">Google grants read access to your Drive. The reader opens books from your chosen folder and saves progress in its private app-data folder.</p>
+      <p id="drive-status" class="drive-status" role="status" aria-live="polite">Connect to see your books.</p>
+      <div id="drive-browser" hidden>
+        <div class="drive-folder-actions">
+          <button id="drive-root" class="text-button" type="button">My Drive</button>
+          <button id="drive-up" class="text-button" type="button">Back</button>
+          <button id="drive-refresh" class="text-button" type="button">Refresh</button>
+          <button id="drive-use-folder" class="text-button" type="button">Use this folder</button>
+        </div>
+        <h3 id="drive-folder-name">My Drive</h3>
+        <label class="visually-hidden" for="drive-filter">Filter books and folders</label>
+        <input id="drive-filter" type="search" placeholder="Filter books and folders…" autocomplete="off" />
+        <p id="drive-list-status" class="drive-hint" role="status"></p>
+        <ul id="drive-files" class="drive-files"></ul>
+      </div>
+    </dialog>
+
+    <div id="sync-prompt" class="sync-prompt" role="status" hidden>
+      <span>A newer reading position is available from another device.</span>
+      <button id="sync-resume" class="text-button" type="button">Resume there</button>
+      <button id="sync-keep" class="text-button" type="button">Keep reading here</button>
+    </div>
+
     <script src="vendor/jszip.min.js"></script>
     <script src="vendor/epub.min.js"></script>
+    <script src="config.js"></script>
+    <script src="drive.js"></script>
     <script src="app.js"></script>
+    <script src="drive-ui.js"></script>
   </body>
 </html>
