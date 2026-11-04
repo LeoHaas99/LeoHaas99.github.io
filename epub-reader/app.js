@@ -1303,6 +1303,27 @@ async function prepareLocations(book, rendition) {
   }
 }
 
+function resolveChapterHref(href) {
+  const book = state.book;
+  const navigationPath = book?.packaging?.navPath || book?.packaging?.ncxPath;
+  if (!book || !navigationPath) return href;
+
+  // Navigation links are relative to the nav/NCX file, while epub.js indexes
+  // spine hrefs relative to the package file. Preserve the fragment when matching.
+  try {
+    const packageUrl = new URL("https://epub.invalid/");
+    const targetUrl = new URL(href, new URL(navigationPath, packageUrl));
+    if (targetUrl.origin !== packageUrl.origin) return href;
+    const section = book.spine.get(targetUrl.pathname.slice(1));
+    const fragmentIndex = href.indexOf("#");
+    if (section) return section.href + (fragmentIndex < 0 ? "" : href.slice(fragmentIndex));
+  } catch {
+    // Retain the original target for books with nonstandard navigation paths.
+  }
+
+  return href;
+}
+
 function renderTableOfContents(items) {
   elements.tocList.replaceChildren();
   state.tocEntries = [];
@@ -1324,6 +1345,7 @@ function renderTableOfContents(items) {
       const label = `${item.label || "Untitled section"}`.trim();
 
       if (item.href) {
+        const href = resolveChapterHref(item.href);
         const button = document.createElement("button");
         button.className = "toc-link";
         button.type = "button";
@@ -1332,15 +1354,16 @@ function renderTableOfContents(items) {
           const rendition = state.rendition;
           if (!rendition || state.busy) return;
           closeTableOfContents(false);
-          rendition.display(item.href).catch((error) => {
+          hideMobileControls();
+          rendition.display(href).catch((error) => {
             console.error("Could not open this chapter.", error);
             showNotice("That chapter could not be opened.", "error");
           });
         });
         listItem.append(button);
         state.tocEntries.push({
-          href: item.href,
-          ...parseChapterHref(item.href),
+          href,
+          ...parseChapterHref(href),
           label,
           button,
           cfi: null,

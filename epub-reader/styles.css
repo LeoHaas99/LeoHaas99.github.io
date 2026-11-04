@@ -786,6 +786,12 @@ button:disabled {
   box-shadow: var(--shadow);
 }
 
+/* epub.js compensates for chapters added above the viewport in infinite scroll.
+   Browser anchoring would apply that adjustment a second time. */
+.viewer .epub-container {
+  overflow-anchor: none;
+}
+
 .viewer iframe {
   border: 0 !important;
 }
