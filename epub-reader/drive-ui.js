@@ -11,6 +11,7 @@
   let folders = [root];
   let files = [];
   let library = null;
+  let libraryLoaded = false;
   let busy = false;
   let viewVersion = 0;
   let offer = null;
@@ -62,7 +63,7 @@
     closeRecentBooks(false);
     closeTableOfContents(false);
     controls();
-    if (!configured) return;
+    if (!configured || busy) return;
     if (!client.connected) {
       busy = true;
       controls();
@@ -73,11 +74,36 @@
       } catch (error) { fail(error); }
       busy = false;
       controls();
+    } else if (!libraryLoaded) {
+      await loadLibrary();
     } else if (!files.length) {
       await browse(folders);
     } else {
       await loadPreviews();
       renderFiles();
+    }
+  }
+
+  async function loadLibrary() {
+    if (busy || !client.connected) return;
+    const generation = client.generation;
+    const version = ++viewVersion;
+    busy = true;
+    controls();
+    ui["drive-list-status"].textContent = "Loading book folder…";
+    try {
+      const selectedLibrary = await client.library();
+      if (generation !== client.generation || version !== viewVersion) return;
+      library = selectedLibrary;
+      libraryLoaded = true;
+      files = [];
+      folders = library && library.id !== "root" ? [root, library] : [root];
+      busy = false;
+      await browse(folders);
+    } catch (error) {
+      if (generation === client.generation && version === viewVersion) fail(error);
+    } finally {
+      if (generation === client.generation && version === viewVersion) { busy = false; controls(); }
     }
   }
 
@@ -265,14 +291,14 @@
     const generation = client.generation;
     client.status("Connecting to Google Drive…");
     void connection.then(async () => {
-      const selectedLibrary = await client.library();
       await client.flush();
       if (generation !== client.generation) return;
       files = [];
       folders = [root];
-      library = selectedLibrary;
+      library = null;
+      libraryLoaded = false;
       busy = false;
-      await browse(library && library.id !== "root" ? [root, library] : [root]);
+      await loadLibrary();
       await reconcile(true);
     }).catch((error) => { if (generation === client.generation) fail(error); })
       .finally(() => { if (generation === client.generation) { busy = false; controls(); } });
@@ -285,6 +311,7 @@
     files = [];
     folders = [root];
     library = null;
+    libraryLoaded = false;
     previews = new Map();
     offer = null;
     ui["sync-prompt"].hidden = true;
@@ -395,4 +422,8 @@
     isAccountActive: (accountId) => client.account?.id === accountId,
   };
   controls();
+  if (client.connected) {
+    client.status("Connected", "synced");
+    void client.flush();
+  }
 })();

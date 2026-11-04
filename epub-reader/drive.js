@@ -32,11 +32,13 @@
       this.write("device", this.deviceId);
       this.account = this.read("account", null);
       this.token = null;
+      this.tokenTimer = 0;
       this.generation = 0;
       this.active = null;
       this.timer = 0;
       this.flushing = null;
       this.retryDelay = 5000;
+      this.restoreToken();
     }
 
     read(key, fallback) {
@@ -58,6 +60,44 @@
     get connected() {
       return Boolean(this.token && this.token.expiresAt > Date.now() && this.account &&
         this.token.accountId === this.account.id);
+    }
+
+    clearToken() {
+      clearTimeout(this.tokenTimer);
+      this.tokenTimer = 0;
+      this.token = null;
+      try { sessionStorage.removeItem(this.prefix + "token"); } catch { /* Memory-only fallback. */ }
+    }
+
+    restoreToken() {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(this.prefix + "token"));
+        if (typeof saved?.value !== "string" || !saved.value || !Number.isFinite(saved.expiresAt) ||
+            saved.expiresAt <= Date.now() || !validId(saved.accountId) || saved.accountId !== this.account?.id) {
+          this.clearToken();
+          return;
+        }
+        this.token = { value: saved.value, expiresAt: saved.expiresAt, accountId: saved.accountId };
+        this.watchTokenExpiry();
+      } catch { this.clearToken(); }
+    }
+
+    rememberToken() {
+      // Persist only after Drive has identified the account. Never extend the expiry.
+      try { sessionStorage.setItem(this.prefix + "token", JSON.stringify(this.token)); }
+      catch { /* Keep this connection in memory if session storage is unavailable. */ }
+      this.watchTokenExpiry();
+    }
+
+    watchTokenExpiry() {
+      clearTimeout(this.tokenTimer);
+      const token = this.token;
+      this.tokenTimer = setTimeout(() => {
+        if (this.token !== token) return;
+        if (token.expiresAt > Date.now()) { this.watchTokenExpiry(); return; }
+        this.clearToken();
+        this.status("Reconnect to sync. Your position is saved on this device.", "pending");
+      }, Math.min(Math.max(0, token.expiresAt - Date.now()), 2147483647));
     }
 
     async loadIdentity() {
@@ -85,7 +125,7 @@
     // Call directly from a click, after loadIdentity, to preserve popup activation.
     connect() {
       const generation = ++this.generation;
-      this.token = null;
+      this.clearToken();
       return new Promise((resolve, reject) => {
         const client = google.accounts.oauth2.initTokenClient({
           client_id: this.clientId,
@@ -93,7 +133,8 @@
           include_granted_scopes: false,
           callback: async (response) => {
             if (generation !== this.generation) return reject(new Error("Connection cancelled."));
-            if (response.error || !response.access_token || !(Number(response.expires_in) > 0) ||
+            if (response.error || !response.access_token || !Number.isFinite(Number(response.expires_in)) ||
+                !(Number(response.expires_in) > 0) ||
                 !google.accounts.oauth2.hasGrantedAllScopes(response, ...SCOPES)) {
               return reject(new Error("Allow both Drive reading and app-data access to connect the bookshelf."));
             }
@@ -105,24 +146,26 @@
               // Do not flush the previous account's queue while identifying a new token.
               this.token.accountId = this.account.id;
               this.write("account", this.account);
+              this.rememberToken();
               // A new account never inherits another account's active book or queue.
               this.active = null;
               this.status("Connected", "synced");
               resolve(this.account);
             } catch (error) {
-              if (generation === this.generation) this.token = null;
+              if (generation === this.generation) this.clearToken();
               reject(error);
             }
           },
           error_callback: () => reject(new Error("Google sign-in was closed or blocked. Try Connect again.")),
         });
-        client.requestAccessToken({ prompt: "select_account" });
+        const email = typeof this.account?.email === "string" ? this.account.email.trim() : "";
+        client.requestAccessToken(email ? { prompt: "", login_hint: email } : { prompt: "select_account" });
       });
     }
 
     disconnect() {
       this.generation += 1;
-      this.token = null;
+      this.clearToken();
       this.account = null;
       this.active = null;
       clearTimeout(this.timer);
@@ -133,7 +176,7 @@
 
     async request(path, params = {}, options = {}) {
       if (!this.token || this.token.expiresAt <= Date.now()) {
-        this.token = null;
+        this.clearToken();
         this.status("Reconnect to sync. Your position is saved on this device.", "pending");
         throw new Error("Reconnect to Google Drive to continue.");
       }
@@ -154,7 +197,7 @@
         if (generation !== this.generation) throw new Error("Drive account changed. Please try again.");
         if (!response.ok) {
           if (response.status === 401) {
-            this.token = null;
+            this.clearToken();
             this.status("Reconnect to sync. Your position is saved on this device.", "pending");
           }
           const error = new Error(response.status === 401 ? "Reconnect to Google Drive to continue."
