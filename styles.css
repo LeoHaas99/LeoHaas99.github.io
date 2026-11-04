@@ -38,7 +38,7 @@ figure, h1, h2, p { margin: 0; }
 .eyebrow { display: block; font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 1.2px; }
 .stage { display: grid; grid-template-columns: 165px minmax(0, 1fr) 180px; align-items: start; gap: 26px; margin-top: 16px; }
 .left-junk, .right-junk { min-width: 0; }
-.seal { display: flex; flex-direction: column; justify-content: center; width: 153px; height: 153px; margin: 9px auto 30px; border: 3px double var(--ink); border-radius: 50%; background: #cbd4da; box-shadow: 4px 4px 0 var(--ink); text-align: center; transform: rotate(-12deg); }
+.seal { display: flex; flex-direction: column; justify-content: center; width: 153px; height: 153px; margin: 9px auto 30px; border: 3px double var(--ink); border-radius: 50%; background: #eaff00; box-shadow: 4px 4px 0 var(--ink); text-align: center; transform: rotate(-12deg); }
 .seal span { font-size: 9px; font-weight: bold; letter-spacing: 1px; }
 .seal strong { margin: 7px 0; font: 900 25px/0.95 "Arial Black", sans-serif; letter-spacing: -1.5px; }
 .sticky-note { position: relative; margin: 0 3px 25px; padding: 16px 12px 11px; background: #edeade; box-shadow: 3px 4px 0 #19191444; transform: rotate(5deg); }
@@ -73,8 +73,8 @@ figure, h1, h2, p { margin: 0; }
 .site-links a { display: inline-block; padding: 5px 0; color: #003fbb; font-size: 12px; text-underline-offset: 2px; }
 .siuuu-station { text-align: center; transform: rotate(3deg); }
 .siuuu-station .eyebrow { margin: 3px 0 10px; font-size: 9px; letter-spacing: 0; }
-.siuuu-button { display: block; width: 100%; padding: 18px 7px 12px; border: 3px solid var(--ink); background: var(--accent); box-shadow: 5px 6px 0 var(--ink); font: 900 37px/1 "Arial Black", sans-serif; letter-spacing: -2px; transition: background 0.15s; }
-.siuuu-button:hover { background: #cbd4da; }
+.siuuu-button { display: block; width: 100%; padding: 18px 7px 12px; border: 3px solid var(--ink); background: #eaff00; box-shadow: 5px 6px 0 var(--ink); font: 900 37px/1 "Arial Black", sans-serif; letter-spacing: -2px; transition: background 0.15s; }
+.siuuu-button:hover { background: #f2ff66; }
 .siuuu-button span { display: block; margin-top: 7px; font: 10px "Courier New", monospace; letter-spacing: 0; }
 .siuuu-count { display: block; margin: 13px 0 27px; font-size: 10px; }
 .siuuu-count output { font-weight: bold; }
@@ -90,8 +90,7 @@ figure, h1, h2, p { margin: 0; }
 .feed-button { flex-shrink: 0; padding: 4px 7px; border: 2px outset #e8e8e8; background: #d5d8da; font-size: 10px; }
 .feed-button:hover { background: var(--accent); }
 #slop-effects { position: fixed; z-index: 20; inset: 0; overflow: hidden; pointer-events: none; }
-.siuuu-particle { position: absolute; left: var(--x); top: var(--y); padding: 4px 10px; border: 2px solid var(--ink); background: var(--accent); color: var(--ink); font: 900 clamp(25px, 5vw, 72px)/1 "Arial Black", sans-serif; box-shadow: 4px 4px 0 var(--ink); animation: siuuu 1.6s ease-out forwards; }
-.siuuu-particle:nth-child(even) { background: var(--desktop); }
+.siuuu-particle { position: absolute; left: var(--x); top: var(--y); padding: 4px 10px; border: 2px solid var(--ink); background: #eaff00; color: var(--ink); font: 900 clamp(25px, 5vw, 72px)/1 "Arial Black", sans-serif; box-shadow: 4px 4px 0 var(--ink); animation: siuuu 1.6s ease-out forwards; }
 .motion-paused *, .motion-paused *::before, .motion-paused *::after { animation-play-state: paused !important; }
 .motion-paused .bill-screen img { visibility: hidden; }
 .motion-paused .bill-break { display: grid; }
