@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>C# Übungsaufgaben – Prüfung 2</title>
+  <meta name="description" content="14 einfache C#-Praxisaufgaben mit Geschichten, Testfällen und einzeln freischaltbaren Lösungen. Bedingungen und Schleifen, Modul 319.">
+  <link rel="icon" href="../logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#aufgaben">Zu den Aufgaben</a>
+<div class="page">
+  <header>
+    <p class="eyebrow">C# · Modul 319 · 1. Lehrjahr</p>
+    <h1>Übungsaufgaben</h1>
+    <p class="lead">Kleine Programme für die Konsole.</p>
+    <nav aria-label="Aufgabengruppen"><a href="#bedingungen">Bedingungen</a><a href="#schleifen">Schleifen</a><a href="#gemischt">Gemischte Aufgaben</a><a href="#zusatz">Zusatz zu W9</a></nav>
+  </header>
+  <main id="aufgaben">
+    <section aria-labelledby="bedingungen"><h2 id="bedingungen">Bedingungen</h2><details class="exercise" id="aufgabe-01" open>
+  <summary><span class="number">01</span><span class="task-title">Auftrag in der Velowerkstatt<span class="topic">Ein-/Ausgabe · Rechnen · if/else</span></span><span class="time">10–15 Min.</span></summary>
+  <div class="exercise-body">
+    <p>Mila nimmt in der Velowerkstatt Reparaturen an. Ein kleiner Service kostet 12 CHF. Wird ein neuer Schlauch benötigt, kommen 8 CHF dazu. Entwickle einen Rechner für den Auftragszettel.</p>
+    <h3>Dein Auftrag</h3>
+    <ul><li>Frage nach dem Namen der Kundin oder des Kunden und danach, ob ein neuer Schlauch nötig ist (ja/nein).</li><li>Berechne den Gesamtpreis. Gib den Namen und den Preis in CHF aus.</li></ul>
+    
+    <h3>Teste dein Programm</h3>
+    <div class="table-wrap"><table><caption class="sr-only">Testfälle für Aufgabe 01</caption><thead><tr><th scope="col">Eingaben / Werte</th><th scope="col">Erwartetes Ergebnis</th></tr></thead><tbody><tr><td>Mila; ja</td><td class="expected">Mila: 20 CHF</td></tr><tr><td>Noah; nein</td><td class="expected">Noah: 12 CHF</td></tr></tbody></table></div>
+    <details class="hint"><summary>Kleiner Hinweis</summary><p>Beginne mit dem Grundpreis. Nur bei «ja» kommt ein Betrag dazu.</p></details>
+    <details class="solution" data-id="01"><summary>Lösung zu Aufgabe 01</summary>
+      <form class="unlock-form"><label for="password-01">Passwort für Aufgabe 01</label><div class="unlock-row"><input id="password-01" name="password" type="password" required autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="message-01"><button type="submit">Freischalten</button></div></form>
+      <p class="unlock-status" id="message-01" role="status" aria-live="polite"></p>
+      <div class="solution-content" hidden></div>
+    </details>
+  </div>
+</details>
+<details class="exercise" id="aufgabe-02">
+  <summary><span class="number">02</span><span class="task-title">Porto am Versandtisch<span class="topic">if / else if / else · Grenzen</span></span><span class="time">10–15 Min.</span></summary>
+  <div class="exercise-body">
+    <p>In einem kleinen Onlineshop soll das Team das Porto nicht mehr von Hand nachschlagen. Schreibe ein Programm, das aus dem Paketgewicht den Preis bestimmt. Die Preise sind für diese Übung erfunden.</p>
+    <h3>Dein Auftrag</h3>
+    <ul><li>Lies das Gewicht als positive ganze Zahl in Gramm ein.</li><li>Bis einschliesslich 1000 g kostet der Versand 4 CHF, über 1000 bis einschliesslich 5000 g 7 CHF, darüber 10 CHF.</li><li>Gib genau einen Versandpreis aus.</li></ul>
+    
+    <h3>Teste dein Programm</h3>
+    <div class="table-wrap"><table><caption class="sr-only">Testfälle für Aufgabe 02</caption><thead><tr><th scope="col">Eingaben / Werte</th><th scope="col">Erwartetes Ergebnis</th></tr></thead><tbody><tr><td>1000</td><td class="expected">Porto: 4 CHF</td></tr><tr><td>1001</td><td class="expected">Porto: 7 CHF</td></tr><tr><td>5000</td><td class="expected">Porto: 7 CHF</td></tr><tr><td>5001</td><td class="expected">Porto: 10 CHF</td></tr></tbody></table></div>
+    <details class="hint"><summary>Kleiner Hinweis</summary><p>Prüfe zuerst die kleinste Gewichtsstufe. Ist diese falsch, weisst du bereits, dass das Paket schwerer ist.</p></details>
+    <details class="solution" data-id="02"><summary>Lösung zu Aufgabe 02</summary>
+      <form class="unlock-form"><label for="password-02">Passwort für Aufgabe 02</label><div class="unlock-row"><input id="password-02" name="password" type="password" required autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="message-02"><button type="submit">Freischalten</button></div></form>
+      <p class="unlock-status" id="message-02" role="status" aria-live="polite"></p>
+      <div class="solution-content" hidden></div>
+    </details>
+  </div>
+</details>
+<details class="exercise" id="aufgabe-03">
+  <summary><span class="number">03</span><span class="task-title">Zugang zur Schulwerkstatt<span class="topic">&amp;&amp; · || · Klammern</span></span><span class="time">10–15 Min.</span></summary>
+  <div class="exercise-body">
+    <p>Die Schulwerkstatt bekommt eine einfache Zugangskontrolle. Für diese Übung gilt: Eine Person muss mindestens 16 Jahre alt sein. Zusätzlich braucht sie entweder den Einführungskurs oder eine Begleitperson.</p>
+    <h3>Dein Auftrag</h3>
+    <ul><li>Frage nach Alter, Einführungskurs (ja/nein) und Begleitung (ja/nein).</li><li>Gib «Zutritt erlaubt» oder «Zutritt nicht erlaubt» aus. Auch mit Kurs und Begleitung bleibt der Zutritt unter 16 verboten.</li></ul>
+    
+    <h3>Teste dein Programm</h3>
+    <div class="table-wrap"><table><caption class="sr-only">Testfälle für Aufgabe 03</caption><thead><tr><th scope="col">Eingaben / Werte</th><th scope="col">Erwartetes Ergebnis</th></tr></thead><tbody><tr><td>16; ja; nein</td><td class="expected">Zutritt erlaubt</td></tr><tr><td>16; nein; ja</td><td class="expected">Zutritt erlaubt</td></tr><tr><td>16; nein; nein</td><td class="expected">Zutritt nicht erlaubt</td></tr><tr><td>15; ja; ja</td><td class="expected">Zutritt nicht erlaubt</td></tr></tbody></table></div>
+    <details class="hint"><summary>Kleiner Hinweis</summary><p>Die Altersbedingung muss immer gelten. Fasse die beiden Alternativen in einer Klammer zusammen.</p></details>
+    <details class="solution" data-id="03"><summary>Lösung zu Aufgabe 03</summary>
+      <form class="unlock-form"><label for="password-03">Passwort für Aufgabe 03</label><div class="unlock-row"><input id="password-03" name="password" type="password" required autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="message-03"><button type="submit">Freischalten</button></div></form>
+      <p class="unlock-status" id="message-03" role="status" aria-live="polite"></p>
+      <div class="solution-content" hidden></div>
+    </details>
+  </div>
+</details>
+<details class="exercise" id="aufgabe-04">
+  <summary><span class="number">04</span><span class="task-title">Bestellung am Pausenkiosk<span class="topic">decimal · Rechnen · if</span></span><span class="time">10–15 Min.</span></summary>
+  <div class="exercise-body">
+    <p>Am Pausenkiosk kostet ein Brötchen 2.50 CHF. Ab vier Brötchen gibt es einmalig 1 CHF Rabatt auf die ganze Bestellung. Erstelle die kleine Kassenanzeige.</p>
+    <h3>Dein Auftrag</h3>
+    <ul><li>Lies die Anzahl Brötchen ein (ganze Zahl, mindestens 1).</li><li>Berechne den Preis und ziehe gegebenenfalls den Rabatt ab.</li><li>Gib den Gesamtpreis mit zwei Nachkommastellen aus.</li></ul>
+    
+    <h3>Teste dein Programm</h3>
+    <div class="table-wrap"><table><caption class="sr-only">Testfälle für Aufgabe 04</caption><thead><tr><th scope="col">Eingaben / Werte</th><th scope="col">Erwartetes Ergebnis</th></tr></thead><tbody><tr><td>1</td><td class="expected">Total: 2.50 CHF</td></tr><tr><td>3</td><td class="expected">Total: 7.50 CHF</td></tr><tr><td>4</td><td class="expected">Total: 9.00 CHF</td></tr><tr><td>5</td><td class="expected">Total: 11.50 CHF</td></tr></tbody></table></div>
+    <details class="hint"><summary>Kleiner Hinweis</summary><p>Verwende für den Geldbetrag decimal. Eine solche Zahl schreibst du im Code zum Beispiel als 2.50m.</p></details>
+    <details class="solution" data-id="04"><summary>Lösung zu Aufgabe 04</summary>
+      <form class="unlock-form"><label for="password-04">Passwort für Aufgabe 04</label><div class="unlock-row"><input id="password-04" name="password" type="password" required autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="message-04"><button type="submit">Freischalten</button></div></form>
+      <p class="unlock-status" id="message-04" role="status" aria-live="polite"></p>
+      <div class="solution-content" hidden></div>
+    </details>
+  </div>
+</details></section>
+<section aria-labelledby="schleifen"><h2 id="schleifen">Schleifen</h2><details class="exercise" id="aufgabe-05">
+  <summary><span class="number">05</span><span class="task-title">Etiketten für neue Laptops<span class="topic">Zählen · for</span></span><span class="time">10–15 Min.</span></summary>
+  <div class="exercise-body">
+    <p>Die IT-Abteilung beschriftet neue Laptops mit fortlaufenden Inventarnummern. Dein Programm soll die Etiketten als Text vorbereiten.</p>
+    <h3>Dein Auftrag</h3>
+    <ul><li>Frage nach der ersten Inventarnummer (positive ganze Zahl) und der Anzahl Geräte (mindestens 1).</li><li>Gib für jedes Gerät eine eigene Zeile im Format «Laptop 410» aus. Die Nummer steigt jeweils um 1.</li><li>Es müssen genau so viele Etiketten entstehen, wie Geräte eingegeben wurden.</li></ul>
+    
+    <h3>Teste dein Programm</h3>
+    <div class="table-wrap"><table><caption class="sr-only">Testfälle für Aufgabe 05</caption><thead><tr><th scope="col">Eingaben / Werte</th><th scope="col">Erwartetes Ergebnis</th></tr></thead><tbody><tr><td>410; 3</td><td class="expected">Laptop 410
+Laptop 411
+Laptop 412</td></tr><tr><td>99; 1</td><td class="expected">Laptop 99</td></tr></tbody></table></div>
+    <details class="hint"><summary>Kleiner Hinweis</summary><p>Unterscheide die Anzahl gedruckter Etiketten von der Inventarnummer.</p></details>
+    <details class="solution" data-id="05"><summary>Lösung zu Aufgabe 05</summary>
+      <form class="unlock-form"><label for="password-05">Passwort für Aufgabe 05</label><div class="unlock-row"><input id="password-05" name="password" type="password" required autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="message-05"><button type="submit">Freischalten</button></div></form>
+      <p class="unlock-status" id="message-05" role="status" aria-live="polite"></p>
+      <div class="solution-content" hidden></div>
+    </details>
+  </div>
+</details>
+<details class="exercise" id="aufgabe-06">
+  <summary><span class="number">06</span><span class="task-title">Beiträge für den Klassenausflug<span class="topic">for · Summe · Vergleich</span></span><span class="time">15–20 Min.</span></summary>
+  <div class="exercise-body">
+    <p>Fünf Lernende zahlen Geld für einen Klassenausflug ein. Du möchtest wissen, ob die gemeinsamen 40 CHF für die Reservation zusammengekommen sind.</p>
+    <h3>Dein Auftrag</h3>
+    <ul><li>Frage nacheinander nach den fünf Beiträgen in ganzen CHF. 0 ist erlaubt, negative Beträge kommen nicht vor.</li><li>Gib die Summe aus. Melde ab 40 CHF «Reservation möglich».</li><li>Unter 40 CHF soll das Programm stattdessen ausgeben, wie viele CHF noch fehlen.</li></ul>
+    
+    <h3>Teste dein Programm</h3>
+    <div class="table-wrap"><table><caption class="sr-only">Testfälle für Aufgabe 06</caption><thead><tr><th scope="col">Eingaben / Werte</th><th scope="col">Erwartetes Ergebnis</th></tr></thead><tbody><tr><td>10; 10; 5; 5; 10</td><td class="expected">Total: 40 CHF
+Reservation möglich</td></tr><tr><td>5; 5; 5; 5; 5</td><td class="expected">Total: 25 CHF
+Es fehlen: 15 CHF</td></tr><tr><td>0; 0; 0; 0; 0</td><td class="expected">Total: 0 CHF
+Es fehlen: 40 CHF</td></tr></tbody></table></div>
+    <details class="hint"><summary>Kleiner Hinweis</summary><p>Lege die Summe vor der Wiederholung an. Jeder Beitrag wird zur bisherigen Summe addiert.</p></details>
+    <details class="solution" data-id="06"><summary>Lösung zu Aufgabe 06</summary>
+      <form class="unlock-form"><label for="password-06">Passwort für Aufgabe 06</label><div class="unlock-row"><input id="password-06" name="password" type="password" required autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="message-06"><button type="submit">Freischalten</button></div></form>
+      <p class="unlock-status" id="message-06" role="status" aria-live="polite"></p>
+      <div class="solution-content" hidden></div>
+    </details>
+  </div>
+</details>
+<details class="exercise" id="aufgabe-07">
+  <summary><span class="number">07</span><span class="task-title">Ladeanzeige für eine Powerbank<span class="topic">while · Zähler · Begrenzung</span></span><span class="time">15–20 Min.</span></summary>
+  <div class="exercise-body">
+    <p>Für eine Demo soll eine Powerbank am Bildschirm geladen werden. Pro Ladeschritt steigt die Anzeige um 15 Prozentpunkte. Bei 100 % ist Schluss; echte Wartezeiten brauchst du nicht.</p>
+    <h3>Dein Auftrag</h3>
+    <ul><li>Lies den aktuellen Ladestand ein (ganze Zahl von 0 bis 100).</li><li>Erhöhe ihn schrittweise um 15. Wenn ein Schritt über 100 führen würde, setze den Ladestand auf 100.</li><li>Gib nach jedem Ladeschritt den neuen Stand aus. Zeige am Schluss die Anzahl Schritte. Bei bereits 100 % sind es 0 Schritte.</li></ul>
+    
+    <h3>Teste dein Programm</h3>
+    <div class="table-wrap"><table><caption class="sr-only">Testfälle für Aufgabe 07</caption><thead><tr><th scope="col">Eingaben / Werte</th><th scope="col">Erwartetes Ergebnis</th></tr></thead><tbody><tr><td>70</td><td class="expected">Ladestand: 85 %
+Ladestand: 100 %
+Schritte: 2</td></tr><tr><td>95</td><td class="expected">Ladestand: 100 %
+Schritte: 1</td></tr><tr><td>100</td><td class="expected">Schritte: 0</td></tr></tbody></table></div>
+    <details class="hint"><summary>Kleiner Hinweis</summary><p>Prüfe vor jedem Ladeschritt, ob die Powerbank schon voll ist.</p></details>
+    <details class="solution" data-id="07"><summary>Lösung zu Aufgabe 07</summary>
+      <form class="unlock-form"><label for="password-07">Passwort für Aufgabe 07</label><div class="unlock-row"><input id="password-07" name="password" type="password" required autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="message-07"><button type="submit">Freischalten</button></div></form>
+      <p class="unlock-status" id="message-07" role="status" aria-live="polite"></p>
+      <div class="solution-content" hidden></div>
+    </details>
+  </div>
+</details>
+<details class="exercise" id="aufgabe-08">
+  <summary><span class="number">08</span><span class="task-title">Tickets für den Schulabend<span class="topic">do-while · Eingabeprüfung · ||</span></span><span class="time">10–15 Min.</span></summary>
+  <div class="exercise-body">
+    <p>Für den Schulabend dürfen pro Bestellung 1 bis 6 Tickets reserviert werden. Ein Ticket kostet 8 CHF. Die Kasse soll erst weitergehen, wenn eine erlaubte Anzahl eingegeben wurde.</p>
+    <h3>Dein Auftrag</h3>
+    <ul><li>Frage nach der Ticketanzahl. Bei einer Zahl kleiner als 1 oder grösser als 6 erscheint «Bitte 1 bis 6 Tickets wählen». Danach wird erneut gefragt.</li><li>Sobald die Anzahl gültig ist, gib den Gesamtpreis aus und beende das Programm.</li></ul>
+    
+    <h3>Teste dein Programm</h3>
+    <div class="table-wrap"><table><caption class="sr-only">Testfälle für Aufgabe 08</caption><thead><tr><th scope="col">Eingaben / Werte</th><th scope="col">Erwartetes Ergebnis</th></tr></thead><tbody><tr><td>0; 7; 3</td><td class="expected">Zwei Fehlermeldungen, danach Total: 24 CHF</td></tr><tr><td>1</td><td class="expected">Total: 8 CHF</td></tr><tr><td>6</td><td class="expected">Total: 48 CHF</td></tr></tbody></table></div>
+    <details class="hint"><summary>Kleiner Hinweis</summary><p>Mindestens eine Eingabe ist nötig. Wiederhole, solange die Zahl ausserhalb des erlaubten Bereichs liegt.</p></details>
+    <details class="solution" data-id="08"><summary>Lösung zu Aufgabe 08</summary>
+      <form class="unlock-form"><label for="password-08">Passwort für Aufgabe 08</label><div class="unlock-row"><input id="password-08" name="password" type="password" required autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="message-08"><button type="submit">Freischalten</button></div></form>
+      <p class="unlock-status" id="message-08" role="status" aria-live="polite"></p>
+      <div class="solution-content" hidden></div>
+    </details>
+  </div>
+</details>
+<details class="exercise" id="aufgabe-09">
+  <summary><span class="number">09</span><span class="task-title">Spenden am Kuchenstand<span class="topic">Abbruchwert · Summe · Zähler</span></span><span class="time">15–20 Min.</span></summary>
+  <div class="exercise-body">
+    <p>Am Kuchenstand gehen unterschiedlich viele Spenden ein. Dein Programm erfasst die Beträge, bis der Stand schliesst.</p>
+    <h3>Dein Auftrag</h3>
+    <ul><li>Lies wiederholt ganze CHF-Beträge ein. Eine 0 beendet die Erfassung.</li><li>Positive Beträge werden addiert und als Spende gezählt. Bei negativen Beträgen erscheint «Betrag ungültig»; sie verändern weder Summe noch Anzahl.</li><li>Gib zum Schluss Anzahl Spenden und Total aus. Auch eine sofortige 0 muss funktionieren.</li></ul>
+    
+    <h3>Teste dein Programm</h3>
+    <div class="table-wrap"><table><caption class="sr-only">Testfälle für Aufgabe 09</caption><thead><tr><th scope="col">Eingaben / Werte</th><th scope="col">Erwartetes Ergebnis</th></tr></thead><tbody><tr><td>5; 2; 0</td><td class="expected">Spenden: 2
+Total: 7 CHF</td></tr><tr><td>5; -3; 2; 0</td><td class="expected">Betrag ungültig; am Schluss Spenden: 2, Total: 7 CHF</td></tr><tr><td>0</td><td class="expected">Spenden: 0
+Total: 0 CHF</td></tr></tbody></table></div>
+    <details class="hint"><summary>Kleiner Hinweis</summary><p>Der Abbruchwert gehört nicht zur Summe und zählt nicht als Spende.</p></details>
+    <details class="solution" data-id="09"><summary>Lösung zu Aufgabe 09</summary>
+      <form class="unlock-form"><label for="password-09">Passwort für Aufgabe 09</label><div class="unlock-row"><input id="password-09" name="password" type="password" required autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="message-09"><button type="submit">Freischalten</button></div></form>
+      <p class="unlock-status" id="message-09" role="status" aria-live="polite"></p>
+      <div class="solution-content" hidden></div>
+    </details>
+  </div>
+</details></section>
+<section aria-labelledby="gemischt"><h2 id="gemischt">Gemischte Aufgaben</h2><details class="exercise" id="aufgabe-10">
+  <summary><span class="number">10</span><span class="task-title">Schliessfach mit drei Versuchen<span class="topic">Bedingung · Schleife · bool</span></span><span class="time">15–20 Min.</span></summary>
+  <div class="exercise-body">
+    <p>Baue eine Konsolen-Demo für ein Schliessfach. Der feste Übungscode lautet 2468. Nach höchstens drei falschen Versuchen wird die Eingabe gesperrt.</p>
+    <h3>Dein Auftrag</h3>
+    <ul><li>Frage nach dem Code. Bei einem Treffer erscheint «Fach offen» und es gibt keine weitere Eingabe.</li><li>Bei einem falschen Code erscheint «Code falsch». Nach dem dritten falschen Code erscheint zusätzlich «Fach gesperrt».</li><li>Ein Treffer beim dritten Versuch muss das Fach noch öffnen.</li></ul>
+    
+    <h3>Teste dein Programm</h3>
+    <div class="table-wrap"><table><caption class="sr-only">Testfälle für Aufgabe 10</caption><thead><tr><th scope="col">Eingaben / Werte</th><th scope="col">Erwartetes Ergebnis</th></tr></thead><tbody><tr><td>2468</td><td class="expected">Fach offen</td></tr><tr><td>1111; 2222; 2468</td><td class="expected">Zweimal Code falsch, danach Fach offen</td></tr><tr><td>1111; 2222; 3333</td><td class="expected">Dreimal Code falsch, danach Fach gesperrt</td></tr></tbody></table></div>
+    <details class="hint"><summary>Kleiner Hinweis</summary><p>Merke dir die Anzahl Versuche und mit einem bool, ob das Fach schon geöffnet wurde.</p></details>
+    <details class="solution" data-id="10"><summary>Lösung zu Aufgabe 10</summary>
+      <form class="unlock-form"><label for="password-10">Passwort für Aufgabe 10</label><div class="unlock-row"><input id="password-10" name="password" type="password" required autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="message-10"><button type="submit">Freischalten</button></div></form>
+      <p class="unlock-status" id="message-10" role="status" aria-live="polite"></p>
+      <div class="solution-content" hidden></div>
+    </details>
+  </div>
+</details>
+<details class="exercise" id="aufgabe-11">
+  <summary><span class="number">11</span><span class="task-title">Den Gutscheindruck reparieren<span class="topic">Code lesen · Fehler finden · for</span></span><span class="time">10–15 Min.</span></summary>
+  <div class="exercise-body">
+    <p>Ein Kollege hat den Gutscheindruck für das Schulfest angefangen. Drei Gutscheine zu je 4 CHF sollen gedruckt werden. Leider stimmen weder die Etiketten noch das Total.</p>
+    <h3>Dein Auftrag</h3>
+    <ul><li>Notiere zuerst ohne Ausführen, welche Zeilen der vorhandene Code ausgibt.</li><li>Repariere die zwei fehlerhaften Stellen. Für anzahl = 3 sollen genau Gutschein 1, Gutschein 2 und Gutschein 3 sowie Total: 12 CHF erscheinen.</li><li>Prüfe danach auch anzahl = 1 und anzahl = 5.</li></ul>
+    <h3>Vorhandener Code</h3><pre tabindex="0" aria-label="Fehlerhafter C#-Code"><code>int anzahl = 3;
+int total = 0;
+for (int nummer = 0; nummer &lt;= anzahl; nummer++)
+{
+    Console.WriteLine(&quot;Gutschein &quot; + nummer);
+    total =+ 4;
+}
+Console.WriteLine(&quot;Total: &quot; + total + &quot; CHF&quot;);</code></pre>
+    <h3>Teste dein Programm</h3>
+    <div class="table-wrap"><table><caption class="sr-only">Testfälle für Aufgabe 11</caption><thead><tr><th scope="col">Eingaben / Werte</th><th scope="col">Erwartetes Ergebnis</th></tr></thead><tbody><tr><td>anzahl = 3</td><td class="expected">Gutschein 1
+Gutschein 2
+Gutschein 3
+Total: 12 CHF</td></tr><tr><td>anzahl = 1</td><td class="expected">Gutschein 1
+Total: 4 CHF</td></tr><tr><td>anzahl = 5</td><td class="expected">Gutschein 1 bis Gutschein 5; Total: 20 CHF</td></tr></tbody></table></div>
+    <details class="hint"><summary>Kleiner Hinweis</summary><p>Prüfe den Startwert des Zählers und die Reihenfolge der Zeichen beim Addieren.</p></details>
+    <details class="solution" data-id="11"><summary>Lösung zu Aufgabe 11</summary>
+      <form class="unlock-form"><label for="password-11">Passwort für Aufgabe 11</label><div class="unlock-row"><input id="password-11" name="password" type="password" required autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="message-11"><button type="submit">Freischalten</button></div></form>
+      <p class="unlock-status" id="message-11" role="status" aria-live="polite"></p>
+      <div class="solution-content" hidden></div>
+    </details>
+  </div>
+</details>
+<details class="exercise" id="aufgabe-12">
+  <summary><span class="number">12</span><span class="task-title">Plätze im Ausflugsbus<span class="topic">while · if/else · Restplätze</span></span><span class="time">20–25 Min.</span></summary>
+  <div class="exercise-body">
+    <p>Für einen Ausflug stehen 12 freie Busplätze bereit. Gruppen melden sich nacheinander an. Schreibe ein Programm, das entscheidet, ob eine ganze Gruppe noch Platz hat.</p>
+    <h3>Dein Auftrag</h3>
+    <ul><li>Starte mit 12 freien Plätzen. Lies jeweils eine Gruppengrösse ein. 0 beendet die Anmeldung.</li><li>Eine positive Gruppe wird nur angenommen, wenn sie vollständig Platz hat. Ziehe dann ihre Grösse ab und gib «Gruppe gebucht» aus. Sonst erscheint «Zu wenig Platz».</li><li>Negative Zahlen werden mit «Grösse ungültig» abgewiesen. Nach jeder Eingabe ausser 0 zeigst du die freien Plätze.</li><li>Sind alle Plätze belegt, erscheint «Bus voll» und das Programm endet ohne weitere Eingabe. Bei 0 zeigst du die verbleibenden freien Plätze.</li></ul>
+    
+    <h3>Teste dein Programm</h3>
+    <div class="table-wrap"><table><caption class="sr-only">Testfälle für Aufgabe 12</caption><thead><tr><th scope="col">Eingaben / Werte</th><th scope="col">Erwartetes Ergebnis</th></tr></thead><tbody><tr><td>5; 8; 7</td><td class="expected">5 gebucht; 8 abgewiesen; 7 gebucht; Bus voll</td></tr><tr><td>12</td><td class="expected">Gruppe gebucht
+Freie Plätze: 0
+Bus voll</td></tr><tr><td>-2; 0</td><td class="expected">Grösse ungültig; es bleiben 12 freie Plätze</td></tr><tr><td>0</td><td class="expected">Freie Plätze: 12</td></tr></tbody></table></div>
+    <details class="hint"><summary>Kleiner Hinweis</summary><p>Nur eine erfolgreiche Buchung verändert die freien Plätze. Die Wiederholung endet bei 0 oder bei vollem Bus.</p></details>
+    <details class="solution" data-id="12"><summary>Lösung zu Aufgabe 12</summary>
+      <form class="unlock-form"><label for="password-12">Passwort für Aufgabe 12</label><div class="unlock-row"><input id="password-12" name="password" type="password" required autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="message-12"><button type="submit">Freischalten</button></div></form>
+      <p class="unlock-status" id="message-12" role="status" aria-live="polite"></p>
+      <div class="solution-content" hidden></div>
+    </details>
+  </div>
+</details></section>
+<section aria-labelledby="zusatz"><h2 id="zusatz">Zusatz zu W9</h2><p class="section-note">Zwei kurze Zusatzübungen zu den weiteren Inhalten von W9.</p><details class="exercise" id="aufgabe-13">
+  <summary><span class="number">13</span><span class="task-title">Kontrollrunde im Computerraum<span class="topic">break · continue</span></span><span class="time">15–20 Min.</span></summary>
+  <div class="exercise-body">
+    <p>Vor dem Unterricht werden bis zu fünf PCs kontrolliert. Ein belegter PC wird übersprungen. Sobald ein Defekt gefunden wird, endet die Runde, damit er gemeldet werden kann.</p>
+    <h3>Dein Auftrag</h3>
+    <ul><li>Frage für PC 1 bis PC 5 nach dem Zustand: ok, belegt oder defekt. Andere Eingaben kommen nicht vor.</li><li>Bei belegt geht es direkt zum nächsten PC. Bei defekt erscheint «Defekt an PC X» und die ganze Runde endet.</li><li>Zähle nur die PCs mit Zustand ok. Gib zum Schluss «Geprüft und OK: X» aus. Nutze hier break und continue.</li></ul>
+    
+    <h3>Teste dein Programm</h3>
+    <div class="table-wrap"><table><caption class="sr-only">Testfälle für Aufgabe 13</caption><thead><tr><th scope="col">Eingaben / Werte</th><th scope="col">Erwartetes Ergebnis</th></tr></thead><tbody><tr><td>ok; belegt; defekt</td><td class="expected">Defekt an PC 3
+Geprüft und OK: 1</td></tr><tr><td>ok; ok; ok; ok; ok</td><td class="expected">Geprüft und OK: 5</td></tr><tr><td>defekt</td><td class="expected">Defekt an PC 1
+Geprüft und OK: 0</td></tr></tbody></table></div>
+    <details class="hint"><summary>Kleiner Hinweis</summary><p>continue überspringt den Rest eines Durchlaufs. break beendet die ganze Wiederholung.</p></details>
+    <details class="solution" data-id="13"><summary>Lösung zu Aufgabe 13</summary>
+      <form class="unlock-form"><label for="password-13">Passwort für Aufgabe 13</label><div class="unlock-row"><input id="password-13" name="password" type="password" required autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="message-13"><button type="submit">Freischalten</button></div></form>
+      <p class="unlock-status" id="message-13" role="status" aria-live="polite"></p>
+      <div class="solution-content" hidden></div>
+    </details>
+  </div>
+</details>
+<details class="exercise" id="aufgabe-14">
+  <summary><span class="number">14</span><span class="task-title">Sitzplan für den Elternabend<span class="topic">Verschachtelte Schleifen</span></span><span class="time">15–20 Min.</span></summary>
+  <div class="exercise-body">
+    <p>Für den Elternabend werden Stühle in Reihen aufgestellt. Das Organisationsteam braucht einen einfachen Textplan mit einer Kennung für jeden Platz.</p>
+    <h3>Dein Auftrag</h3>
+    <ul><li>Lies die Anzahl Reihen und die Plätze pro Reihe ein (jeweils 1 bis 9; gültige Eingaben vorausgesetzt).</li><li>Jede Reihe bekommt eine eigene Ausgabezeile. Die Plätze heissen R1P1, R1P2 usw. Trenne sie durch Leerzeichen.</li><li>Gib anschliessend die Gesamtzahl der Plätze aus. Ein Leerzeichen am Zeilenende ist erlaubt.</li></ul>
+    
+    <h3>Teste dein Programm</h3>
+    <div class="table-wrap"><table><caption class="sr-only">Testfälle für Aufgabe 14</caption><thead><tr><th scope="col">Eingaben / Werte</th><th scope="col">Erwartetes Ergebnis</th></tr></thead><tbody><tr><td>2; 3</td><td class="expected">R1P1 R1P2 R1P3
+R2P1 R2P2 R2P3
+Plätze: 6</td></tr><tr><td>1; 1</td><td class="expected">R1P1
+Plätze: 1</td></tr></tbody></table></div>
+    <details class="hint"><summary>Kleiner Hinweis</summary><p>Eine Wiederholung wechselt die Reihe. Innerhalb jeder Reihe werden die einzelnen Plätze ausgegeben.</p></details>
+    <details class="solution" data-id="14"><summary>Lösung zu Aufgabe 14</summary>
+      <form class="unlock-form"><label for="password-14">Passwort für Aufgabe 14</label><div class="unlock-row"><input id="password-14" name="password" type="password" required autocomplete="off" spellcheck="false" autocapitalize="none" aria-describedby="message-14"><button type="submit">Freischalten</button></div></form>
+      <p class="unlock-status" id="message-14" role="status" aria-live="polite"></p>
+      <div class="solution-content" hidden></div>
+    </details>
+  </div>
+</details></section>
+  </main>
+  <footer>
+    <p>Grundlage: <a href="https://af81.github.io/csharp-school/semesterplan/">Semesterplan</a> · <a href="https://af81.github.io/csharp-school/schueler/bedingungen-handout/">W6</a> · <a href="https://af81.github.io/csharp-school/schueler/schleifen-handout/">W8</a> · <a href="https://af81.github.io/csharp-school/schueler/schleifen2-handout/">W9</a></p>
+    <p>Eigene Übungsaufgaben, keine offiziellen Prüfungsaufgaben. Stand: 5. November 2026. Der Ausschluss von W7 ist mündlich mitgeteilt und steht nicht auf der Kursseite.</p>
+  </footer>
+</div>
+</body>
+</html>
