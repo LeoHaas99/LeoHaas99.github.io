@@ -1846,6 +1846,12 @@ function handleReaderRegionClick(
   contents = null,
   allowSuppressedClick = false,
 ) {
+  // Book clicks happen in an iframe and never reach the outer document listener.
+  if (event.button <= 0 && dismissPanelsOutside(event.target)) {
+    event.preventDefault();
+    suppressReaderRegionClickUntil = Date.now() + 650;
+    return;
+  }
   if (
     !isMobileLayout() ||
     !state.rendition ||
@@ -2376,6 +2382,26 @@ function closeTableOfContents(restoreFocus = true) {
   elements.tocToggle.setAttribute("aria-expanded", "false");
 }
 
+function dismissPanelsOutside(target) {
+  let dismissed = false;
+  for (const [panel, menu, close] of [
+    [elements.recentPanel, elements.recentMenu, closeRecentBooks],
+    [elements.searchPanel, elements.searchMenu, closeSearch],
+    [elements.mobileReadingPanel, elements.mobileReadingMenu, closeMobileReadingMenu],
+  ]) {
+    if (!panel.hidden && !menu.contains(target)) {
+      close(false);
+      dismissed = true;
+    }
+  }
+  if (elements.tocPanel.classList.contains("is-open") &&
+      !elements.tocPanel.contains(target) && !elements.tocToggle.contains(target)) {
+    closeTableOfContents(false);
+    dismissed = true;
+  }
+  return dismissed;
+}
+
 async function seekToProgress() {
   if (!state.locationsReady || !state.book || !state.rendition || state.busy) return;
   window.readerDrive?.interact();
@@ -2596,18 +2622,7 @@ function initialize() {
   document.addEventListener("dragleave", handleDragLeave);
   document.addEventListener("drop", handleDrop);
   document.addEventListener("click", (event) => {
-    if (!elements.recentPanel.hidden && !elements.recentMenu.contains(event.target)) {
-      closeRecentBooks(false);
-    }
-    if (!elements.searchPanel.hidden && !elements.searchMenu.contains(event.target)) {
-      closeSearch(false);
-    }
-    if (
-      !elements.mobileReadingPanel.hidden &&
-      !elements.mobileReadingMenu.contains(event.target)
-    ) {
-      closeMobileReadingMenu(false);
-    }
+    dismissPanelsOutside(event.target);
     if (!elements.selectionActions.hidden && !elements.selectionActions.contains(event.target)) {
       closeSelectionActions(true);
     }

@@ -22,9 +22,10 @@
   }
 
   class DriveClient {
-    constructor(clientId, onStatus = () => {}) {
+    constructor(clientId, onStatus = () => {}, onAuthRequired = () => {}) {
       this.clientId = clientId;
       this.onStatus = onStatus;
+      this.onAuthRequired = onAuthRequired;
       this.prefix = `epub-reader:drive:v1:${clientId}:`;
       this.memory = new Map();
       this.storageWarning = false;
@@ -69,6 +70,12 @@
       try { sessionStorage.removeItem(this.prefix + "token"); } catch { /* Memory-only fallback. */ }
     }
 
+    requireConnection() {
+      this.clearToken();
+      this.status("Connection expired. Your position is saved on this device.", "pending");
+      this.onAuthRequired();
+    }
+
     restoreToken() {
       try {
         const saved = JSON.parse(sessionStorage.getItem(this.prefix + "token"));
@@ -95,8 +102,7 @@
       this.tokenTimer = setTimeout(() => {
         if (this.token !== token) return;
         if (token.expiresAt > Date.now()) { this.watchTokenExpiry(); return; }
-        this.clearToken();
-        this.status("Reconnect to sync. Your position is saved on this device.", "pending");
+        this.requireConnection();
       }, Math.min(Math.max(0, token.expiresAt - Date.now()), 2147483647));
     }
 
@@ -124,47 +130,72 @@
 
     // Call directly from a click, after loadIdentity, to preserve popup activation.
     connect() {
+      this.cancelConnection?.();
       const generation = ++this.generation;
       this.clearToken();
       return new Promise((resolve, reject) => {
-        const client = google.accounts.oauth2.initTokenClient({
-          client_id: this.clientId,
-          scope: SCOPES.join(" "),
-          include_granted_scopes: false,
-          callback: async (response) => {
-            if (generation !== this.generation) return reject(new Error("Connection cancelled."));
-            if (response.error || !response.access_token || !Number.isFinite(Number(response.expires_in)) ||
-                !(Number(response.expires_in) > 0) ||
-                !google.accounts.oauth2.hasGrantedAllScopes(response, ...SCOPES)) {
-              return reject(new Error("Allow both Drive reading and app-data access to connect the bookshelf."));
-            }
-            this.token = { value: response.access_token, expiresAt: Date.now() + Number(response.expires_in) * 1000 - 30000 };
-            try {
-              const { user } = await this.request("about", { fields: "user(permissionId,displayName,emailAddress)" });
-              if (!validId(user?.permissionId)) throw new Error("Google did not return an account identifier.");
-              this.account = { id: user.permissionId, name: user.displayName, email: user.emailAddress };
-              // Do not flush the previous account's queue while identifying a new token.
-              this.token.accountId = this.account.id;
-              this.write("account", this.account);
-              this.rememberToken();
-              // A new account never inherits another account's active book or queue.
-              this.active = null;
-              this.status("Connected", "synced");
-              resolve(this.account);
-            } catch (error) {
-              if (generation === this.generation) this.clearToken();
-              reject(error);
-            }
-          },
-          error_callback: () => reject(new Error("Google sign-in was closed or blocked. Try Connect again.")),
-        });
-        const email = typeof this.account?.email === "string" ? this.account.email.trim() : "";
-        client.requestAccessToken(email ? { prompt: "", login_hint: email } : { prompt: "select_account" });
+        let settled = false;
+        const finish = (error, account) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          if (this.cancelConnection === cancel) this.cancelConnection = null;
+          if (error) reject(error);
+          else resolve(account);
+        };
+        const cancel = () => finish(new Error("Connection cancelled."));
+        this.cancelConnection = cancel;
+        const timer = setTimeout(() => {
+          this.clearToken();
+          finish(Object.assign(new Error("Google sign-in timed out. Try Reconnect again."), { code: "timeout" }));
+        }, 180000);
+        try {
+          const client = google.accounts.oauth2.initTokenClient({
+            client_id: this.clientId,
+            scope: SCOPES.join(" "),
+            include_granted_scopes: false,
+            callback: async (response) => {
+              if (settled || generation !== this.generation) return;
+              if (response.error || !response.access_token || !Number.isFinite(Number(response.expires_in)) ||
+                  !(Number(response.expires_in) > 0) ||
+                  !google.accounts.oauth2.hasGrantedAllScopes(response, ...SCOPES)) {
+                return finish(Object.assign(new Error("Allow both Drive reading and app-data access to connect the bookshelf."),
+                  { code: response.error || "missing_permissions" }));
+              }
+              this.token = { value: response.access_token, expiresAt: Date.now() + Number(response.expires_in) * 1000 - 30000 };
+              try {
+                const { user } = await this.request("about", { fields: "user(permissionId,displayName,emailAddress)" });
+                if (settled || generation !== this.generation) return;
+                if (!validId(user?.permissionId)) throw new Error("Google did not return an account identifier.");
+                const previousAccountId = this.account?.id;
+                this.account = { id: user.permissionId, name: user.displayName, email: user.emailAddress };
+                // Do not flush the previous account's queue while identifying a new token.
+                this.token.accountId = this.account.id;
+                this.write("account", this.account);
+                this.rememberToken();
+                // A new account never inherits another account's active book or queue.
+                if (previousAccountId !== this.account.id) this.active = null;
+                this.status("Connected", "synced");
+                finish(null, this.account);
+              } catch (error) {
+                if (generation === this.generation) this.clearToken();
+                finish(error);
+              }
+            },
+            error_callback: (error) => finish(Object.assign(
+              new Error("Google sign-in was closed or blocked. Tap Reconnect to continue."),
+              { code: error?.type || "unknown" },
+            )),
+          });
+          const email = typeof this.account?.email === "string" ? this.account.email.trim() : "";
+          client.requestAccessToken(email ? { prompt: "", login_hint: email } : { prompt: "select_account" });
+        } catch (error) { finish(error); }
       });
     }
 
     disconnect() {
       this.generation += 1;
+      this.cancelConnection?.();
       this.clearToken();
       this.account = null;
       this.active = null;
@@ -176,8 +207,7 @@
 
     async request(path, params = {}, options = {}) {
       if (!this.token || this.token.expiresAt <= Date.now()) {
-        this.clearToken();
-        this.status("Reconnect to sync. Your position is saved on this device.", "pending");
+        this.requireConnection();
         throw new Error("Reconnect to Google Drive to continue.");
       }
       const generation = this.generation;
@@ -197,8 +227,7 @@
         if (generation !== this.generation) throw new Error("Drive account changed. Please try again.");
         if (!response.ok) {
           if (response.status === 401) {
-            this.clearToken();
-            this.status("Reconnect to sync. Your position is saved on this device.", "pending");
+            this.requireConnection();
           }
           const error = new Error(response.status === 401 ? "Reconnect to Google Drive to continue."
             : response.status === 404 ? "That Drive file or folder is no longer available."
@@ -362,7 +391,10 @@
 
     flush() {
       if (this.flushing) return this.flushing;
-      if (!this.connected) return Promise.resolve();
+      if (!this.connected) {
+        this.onAuthRequired();
+        return Promise.resolve();
+      }
       const accountId = this.account.id;
       const generation = this.generation;
       const run = async () => {

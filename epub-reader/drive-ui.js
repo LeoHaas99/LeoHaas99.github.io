@@ -3,7 +3,7 @@
     "drive-setup", "drive-connect", "drive-disconnect", "drive-sync", "drive-status", "drive-permissions",
     "drive-browser", "drive-root", "drive-up", "drive-refresh", "drive-use-folder", "drive-folder-name",
     "drive-filter", "drive-list-status", "drive-files", "sync-prompt", "sync-resume", "sync-keep",
-    "offline-book-status", "remove-offline-book"];
+    "offline-book-status", "remove-offline-book", "drive-reconnect-prompt", "drive-reconnect"];
   const ui = Object.fromEntries(ids.map((id) => [id, document.getElementById(id)]));
   const clientId = window.READER_CONFIG?.googleClientId?.trim() || "";
   const configured = /^[\w.-]+\.apps\.googleusercontent\.com$/.test(clientId);
@@ -13,6 +13,11 @@
   let library = null;
   let libraryLoaded = false;
   let busy = false;
+  let connecting = false;
+  let connectionVersion = 0;
+  let reconnectTimer = 0;
+  let reconnectDelay = 5000;
+  let reconnectPaused = false;
   let viewVersion = 0;
   let offer = null;
   let checking = false;
@@ -25,13 +30,15 @@
     ui["bookshelf-toggle"].dataset.sync = kind;
     ui["bookshelf-toggle"].title = `Google Drive bookshelf — ${message}`;
     controls();
-  });
+  }, () => scheduleReconnect());
 
   function controls() {
     ui["drive-setup"].hidden = configured;
     ui["drive-connect"].hidden = client.connected;
     ui["drive-connect"].textContent = client.account ? "Reconnect Google Drive" : "Connect Google Drive";
-    ui["drive-connect"].disabled = !configured || busy;
+    ui["drive-connect"].disabled = !configured || busy || connecting;
+    ui["drive-reconnect"].disabled = busy || connecting;
+    ui["drive-reconnect-prompt"].hidden = !client.account || client.connected || connecting || !reconnectPaused;
     ui["drive-disconnect"].hidden = !client.account;
     ui["drive-sync"].hidden = !client.connected;
     ui["drive-permissions"].hidden = client.connected;
@@ -43,7 +50,7 @@
     ui["drive-up"].disabled = busy || folders.length < 2;
     ui["drive-use-folder"].disabled = busy || folders.at(-1).id === library?.id;
     ui["drive-use-folder"].textContent = folders.at(-1).id === library?.id ? "Your book folder" : "Use this folder";
-    ui.bookshelf.setAttribute("aria-busy", String(busy));
+    ui.bookshelf.setAttribute("aria-busy", String(busy || connecting));
     const offline = window.readerBookCache?.lastInfo;
     const available = canOpenCachedBook(offline);
     ui["offline-book-status"].textContent = available
@@ -61,10 +68,12 @@
     if (!ui.bookshelf.open) ui.bookshelf.showModal();
     closeSearch(false);
     closeRecentBooks(false);
+    closeMobileReadingMenu(false);
     closeTableOfContents(false);
     controls();
-    if (!configured || busy) return;
+    if (!configured || busy || connecting) return;
     if (!client.connected) {
+      if (canReconnect()) { await connect(true); return; }
       busy = true;
       controls();
       client.status(client.account ? "Reconnect to open your books and sync positions." : "Loading Google sign-in…");
@@ -82,6 +91,79 @@
       await loadPreviews();
       renderFiles();
     }
+  }
+
+  function canReconnect() {
+    return configured && client.account && !client.connected && !connecting &&
+      !reconnectPaused && navigator.onLine !== false && !document.hidden;
+  }
+
+  function scheduleReconnect(delay = 0) {
+    if (reconnectTimer || !canReconnect()) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = 0;
+      if (canReconnect()) void connect(true);
+    }, delay);
+  }
+
+  async function connect(automatic = false) {
+    if (connecting || !configured || !automatic && busy || automatic && !canReconnect()) return;
+    clearTimeout(reconnectTimer);
+    reconnectTimer = 0;
+    const version = ++connectionVersion;
+    const previousAccountId = client.account?.id;
+    connecting = true;
+    reconnectPaused = false;
+    controls();
+    client.status(automatic ? "Reconnecting to Google Drive…" : "Connecting to Google Drive…", "pending");
+    try {
+      // When already loaded, call connect synchronously to retain a button's popup permission.
+      if (!window.google?.accounts?.oauth2) await client.loadIdentity();
+      if (version !== connectionVersion || automatic && (navigator.onLine === false || document.hidden)) return;
+      await client.connect();
+      if (version !== connectionVersion) return;
+      reconnectDelay = 5000;
+      viewVersion += 1;
+      busy = false;
+      files = [];
+      folders = [root];
+      library = null;
+      libraryLoaded = false;
+      if (previousAccountId !== client.account?.id) {
+        offer = null;
+        ui["sync-prompt"].hidden = true;
+        previews = new Map();
+      }
+      // Let an old-token write finish before starting the new account's flush.
+      await client.flushing;
+      if (version !== connectionVersion) return;
+      await client.flush();
+      if (version !== connectionVersion) return;
+      if (ui.bookshelf.open) await loadLibrary();
+      await reconcile(true);
+    } catch (error) {
+      if (version !== connectionVersion) return;
+      // A blocked/closed popup or denied consent needs a deliberate retry, not a popup loop.
+      reconnectPaused = Boolean(error.code && !["server_error", "temporarily_unavailable"].includes(error.code)) ||
+        error.status === 403;
+      if (reconnectPaused) fail(error);
+      else client.status("Google Drive is unavailable. Retrying automatically; your position is saved on this device.", "pending");
+    } finally {
+      if (version === connectionVersion) {
+        connecting = false;
+        controls();
+        if (!client.connected) {
+          scheduleReconnect(reconnectDelay);
+          reconnectDelay = Math.min(reconnectDelay * 2, 60000);
+        }
+      }
+    }
+  }
+
+  function resumeConnection(force = false) {
+    if (document.hidden || navigator.onLine === false || connecting) return;
+    if (!client.connected) scheduleReconnect();
+    else void client.flush().then(() => reconcile(force));
   }
 
   async function loadLibrary() {
@@ -282,29 +364,15 @@
     finally { checking = false; }
   }
 
-  ui["drive-connect"].addEventListener("click", () => {
-    if (busy) return;
-    if (!window.google?.accounts?.oauth2) { void show(); return; }
-    busy = true;
-    controls();
-    const connection = client.connect();
-    const generation = client.generation;
-    client.status("Connecting to Google Drive…");
-    void connection.then(async () => {
-      await client.flush();
-      if (generation !== client.generation) return;
-      files = [];
-      folders = [root];
-      library = null;
-      libraryLoaded = false;
-      busy = false;
-      await loadLibrary();
-      await reconcile(true);
-    }).catch((error) => { if (generation === client.generation) fail(error); })
-      .finally(() => { if (generation === client.generation) { busy = false; controls(); } });
-  });
+  ui["drive-connect"].addEventListener("click", () => void connect());
+  ui["drive-reconnect"].addEventListener("click", () => void connect());
   ui["drive-disconnect"].addEventListener("click", () => {
     const accountId = client.account?.id;
+    connectionVersion += 1;
+    connecting = false;
+    reconnectPaused = false;
+    clearTimeout(reconnectTimer);
+    reconnectTimer = 0;
     viewVersion += 1;
     client.disconnect();
     busy = false;
@@ -343,19 +411,21 @@
   ui["bookshelf-close"].addEventListener("click", () => ui.bookshelf.close());
   ui.bookshelf.addEventListener("close", () => { viewVersion += 1; busy = false; controls(); renderFiles(); });
   ui.bookshelf.addEventListener("keydown", (event) => event.stopPropagation());
-  let backdropPointer = false;
+  let backdropPointer = null;
   const outside = (event) => {
     const rect = ui.bookshelf.getBoundingClientRect();
     return event.target === ui.bookshelf && (event.clientX < rect.left || event.clientX > rect.right ||
       event.clientY < rect.top || event.clientY > rect.bottom);
   };
   ui.bookshelf.addEventListener("pointerdown", (event) => {
-    backdropPointer = event.pointerType === "mouse" && outside(event);
+    backdropPointer = event.isPrimary && event.button === 0 && outside(event) ? event.pointerId : null;
   });
   ui.bookshelf.addEventListener("click", (event) => {
-    if (backdropPointer && outside(event)) ui.bookshelf.close();
-    backdropPointer = false;
+    if (backdropPointer !== null && outside(event)) ui.bookshelf.close();
+    backdropPointer = null;
   });
+  ui.bookshelf.addEventListener("pointercancel", () => { backdropPointer = null; });
+  ui.bookshelf.addEventListener("close", () => { backdropPointer = null; });
   ui["remove-offline-book"].addEventListener("click", async () => {
     try { await window.readerBookCache.removeLast(); }
     catch { client.status("The offline copy could not be removed. Try again.", "error"); }
@@ -399,11 +469,11 @@
     void client.flush();
   });
 
-  window.addEventListener("online", () => void client.flush().then(() => reconcile(true)));
-  window.addEventListener("focus", () => { if (!ui.bookshelf.open) void reconcile(); });
+  window.addEventListener("online", () => resumeConnection(true));
+  window.addEventListener("focus", () => resumeConnection());
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) void client.flush();
-    else void reconcile();
+    else resumeConnection();
   });
   window.addEventListener("pagehide", () => void client.flush());
 
@@ -425,5 +495,5 @@
   if (client.connected) {
     client.status("Connected", "synced");
     void client.flush();
-  }
+  } else scheduleReconnect();
 })();

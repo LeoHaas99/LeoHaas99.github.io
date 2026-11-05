@@ -1,6 +1,6 @@
 // Bump this version whenever a cached reader file changes. A release waits until
 // all Reader windows close or the user explicitly chooses Update now.
-const CACHE_VERSION = "v11";
+const CACHE_VERSION = "v12";
 const CACHE_PREFIX = `epub-reader:${self.registration.scope}:`;
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const SHELL_FILES = [
