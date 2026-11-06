@@ -39,7 +39,6 @@ summary:hover { color: var(--link); }
 .number { font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 23px; }
 .task-title { flex: 1; font-weight: 600; line-height: 1.45; }
 .topic { display: block; font-weight: 400; font-size: .8rem; color: var(--muted); margin-top: 3px; }
-.time { color: var(--muted); font-size: .8rem; white-space: nowrap; }
 .exercise-body { padding: 0 28px 24px 37px; }
 .exercise-body > p:first-child { margin-top: 0; }
 .table-wrap { max-width: 100%; overflow-x: auto; }
@@ -84,7 +83,6 @@ footer p { margin: 6px 0; }
   .exercise > summary { gap: 10px; flex-wrap: wrap; }
   .task-title { flex-basis: calc(100% - 60px); }
   .exercise > summary::after { order: 0; }
-  .time { order: 1; width: 100%; padding-left: 33px; margin-top: -7px; }
   .exercise-body { padding: 0 0 24px; }
   th, td { padding: 8px; overflow-wrap: anywhere; }
   input { flex: 1; width: 140px; }
